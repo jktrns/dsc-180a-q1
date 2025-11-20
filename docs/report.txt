@@ -1,0 +1,130 @@
+% !TEX TS-program = xelatex
+% !BIB TS-program = bibtex
+\documentclass[12pt,letterpaper]{article}
+\usepackage{style/dsc180reportstyle}
+
+\title{A comparative study of DP-SGD and Private Evolution for differentially private synthetic data}
+
+\author{Mehak Kapur \\
+  {\tt mekapur@ucsd.edu} \\\And
+  Hana Tjendrawasi  \\
+  {\tt htjendrawasi@ucsd.edu} \\\And
+  Jason Tran \\
+  {\tt jat037@ucsd.edu} \\\And
+  Phuc Tran \\
+  {\tt pct001@ucsd.edu} \\\And
+  Yu-Xiang Wang \\
+  {\tt yuxiangw@ucsd.edu} \\}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+    Differentially private synthetic data generation enables the release of realistic datasets while rigorously protecting the privacy of individuals in the source data. Two methodologies dominate contemporary research: (1) differentially private stochastic gradient descent (DP-SGD), which privatizes model training through carefully calibrated noise injection, and (2) Private Evolution (PE), which achieves privacy guarantees through inference-only access to pre-trained foundation models. We implement both approaches on realistic datasets, evaluating their privacy-utility trade-offs under varying $\varepsilon$-budgets and computational constraints. Our objective is to assess whether the PE paradigm can rival the fidelity of DP-SGD while obviating the latter's computational and implementation complexity.
+\end{abstract}
+
+\begin{center}
+Code: \url{https://github.com/jktrns/dsc-180a-q1}
+\end{center}
+
+\maketoc
+\clearpage
+
+\section{Introduction}
+
+\subsection{Motivation and problem statement}
+
+Contemporary machine learning requires large, richly annotated datasets that frequently encode sensitive personal information. The utility of such data for scientific and commercial progress stands in tension with the imperative to protect individual privacy. Traditional anonymization techniques (e.g., removal of explicit identifiers, aggregation) have proven inadequate against adversaries with auxiliary information. \textit{Differential privacy} (DP) provides a rigorous mathematical framework for this challenge, ensuring that any individual's participation in a dataset has negligible impact on the algorithm's output distribution.
+
+The promise of differential privacy is quantified by a \textit{privacy budget} $\varepsilon$, where smaller values confer stronger privacy guarantees at the cost of reduced data utility. Thus, we have a trade-off that pervades all differentially private mechanisms; perfect privacy ($\varepsilon = 0$) is achieved only by revealing nothing whatsoever, yet an unbounded $\varepsilon$ will permit arbitrary disclosure. We must operate within a regime of small but non-trivial $\varepsilon$ to manage this trade-off.
+
+\textit{Synthetic data generation} under differential privacy is particularly appealing here. In this setting, the curator (a trusted party) releases an entirely artificial dataset that captures the statistical properties of the original data while satisfying formal privacy guarantees. Such synthetic datasets come with the benefit of being analyzable using conventional statistical software. Moreover, once released, synthetic data imposes no ongoing privacy cost, unlike interactive mechanisms where privacy loss accumulates with each query.
+
+Two methodologies have emerged for differentially private synthetic data generation:
+\begin{enumerate}
+    \item[(1)] \textit{DP-SGD} \citep{abadi2016deep} modifies the training procedure of generative models through per-sample gradient clipping and Gaussian noise addition. While effective, DP-SGD demands substantial computational power and full access to model internals.
+    \item[(2)] \textit{Private Evolution} (PE) \citep{lin2025differentiallyprivatesyntheticdata} eschews training entirely, instead achieving privacy through careful API calls to pre-trained foundation models.
+\end{enumerate}
+
+This naturally motivates the question: \textit{can training-free, low-complexity methods such as PE achieve utility comparable to that of DP-SGD}? We investigate both approaches empirically, comparing their practical trade-offs in privacy guarantees, computational efficiency, and output fidelity.
+
+\newpage
+
+\subsection{Prior work}
+
+DP, introduced by \citet{dwork2014algorithmic}, promises that the behavior of an algorithm is approximately invariant to the inclusion or exclusion of any single individual's data. This promise is formalized through the requirement that \textit{neighboring databases} (those differing by precisely one record) yield indistinguishable output distributions, up to a multiplicative factor $\exp(\varepsilon)$ and additive slack $\delta$. The seminal work established key mechanisms (e.g., the Laplace and Gaussian mechanisms for numeric queries), along with composition theorems demonstrating that privacy loss accumulates across multiple analyses.
+
+The extension of differential privacy to deep learning proved non-trivial. \citet{abadi2016deep} developed DP-SGD by recognizing that standard gradient descent leaks information through the unbounded influence any single training example can exert on model parameters. Their solution bounds this influence through gradient clipping while injecting calibrated Gaussian noise to mask the contribution of individual samples. Critically, they introduced the \textit{moments accountant}, a privacy accounting technique that yields substantially tighter bounds on cumulative privacy loss than naive composition would suggest.
+
+Building upon DP-SGD, \citet{ghalebikesabi2023differentially} demonstrated that fine-tuning diffusion models with differentially private optimization generates high-fidelity synthetic images. However, their DP-Diffusion approach requires substantial privacy budgets ($\varepsilon \approx 32$ for CIFAR-10) and demands high computational budget, thus limiting practicality.
+
+\citet{lin2025differentiallyprivatesyntheticdata} proposed a fundamentally different paradigm with their Private Evolution algorithm. Rather than training a model, PE operates exclusively through black-box API access to pre-trained foundation models. The algorithm iteratively selects and mutates synthetic candidates by constructing a differentially private histogram over nearest neighbors in an embedding space. This approach achieved Fréchet Inception Distance (FID, the metric for image generation quality) scores of $7.9$ or lower at $\varepsilon = 0.67$ on image generation tasks, a massive improvement in both privacy and utility from DP-Diffusion. The versatility of this approach has resulted in its extension in subsequent works to text \citep{xie2024differentiallyprivatesyntheticdata} and tabular data \citep{swanberg2025apiaccessllmsuseful}.
+
+\newpage
+
+\section{Background}
+
+\subsection{Differential privacy}
+
+We represent databases as histograms $x \in \mathbb{N}^{|\mathcal{X}|}$ over a universe $\mathcal{X}$ of record types, where $x_i$ denotes the count of records of type $i \in \mathcal{X}$ (e.g., $\mathcal{X} = \{\text{student},\, \text{instructor},\, \text{staff}\}$, $x = (150, 30, 20)$). Two databases are \textit{neighboring} if they differ in the record count of exactly one individual (i.e., their $\ell_1$ distance is at most 1: $\|x - y\|_1 \leq 1$).
+
+A randomized mechanism $\mathcal{M} \colon \mathbb{N}^{|\mathcal{X}|} \rightarrow \Delta(B)$ maps databases to probability distributions over outputs in range $B$, where $\Delta(B)$ denotes the \textit{probability simplex} (i.e., the set of all probability distributions over $B$).
+
+\begin{definition}[Differential privacy \citep{dwork2014algorithmic}]
+\label{def:dp}
+$\mathcal{M}$ satisfies $(\varepsilon, \delta)$-differential privacy if for all neighboring databases $x, y$ with $\|x - y\|_1 \leq 1$ and all measurable sets $S \subseteq B$:
+\begin{equation}
+\Pr[\mathcal{M}(x) \in S] \leq \exp(\varepsilon) \Pr[\mathcal{M}(y) \in S] + \delta
+\end{equation}
+When $\delta = 0$, we say $\mathcal{M}$ is $\varepsilon$-differentially private.
+\end{definition}
+
+For small $\varepsilon$, the bound $\exp(\varepsilon) \approx 1 + \varepsilon$ ensures outputs are nearly equally likely regardless of any individual's participation. The slack $\delta$ permits rare catastrophes; we conventionally require $\delta \ll 1/\|x\|_1$.
+
+% TODO
+
+\newpage
+
+\section{Methods}
+
+\subsection{Data, experimental setup}
+Our project uses a synthetic telemetry dataset provided by the instructor. Although the data are artificially generated, we treat them as sensitive to simulate realistic privacy-critical conditions under which differential privacy methods must operate. The dataset is intended to mimic the structure of real-world system telemetry logs, where each record corresponds to a device, session, or event measurement. \\
+
+The dataset is provided specifically for two purposes:
+\begin{itemize}
+    \item \textbf{Differentially private data analysis} \\
+    We will compute statistical summaries such as means, histograms, frequency counts, or regression results using DP mechanisms. These tasks simulate real-world applied DP scenarios faced by organizations analyzing sensitive operational data. \\
+    
+    \item \textbf{Differentially private synthetic data generation} \\
+    We will release a new synthetic dataset that satisfies differential privacy. The goal is to demonstrate how DP-SGD can be used to train a model that captures useful structure from sensitive data while formally protecting all individuals represented in the original dataset.
+\end{itemize} 
+
+All evaluations, models, and analyses focus exclusively on the provided sensitive-like dataset to align with the project goal of designing an end-to-end DP workflow. \\
+
+\textbf{Features} \\
+The telemetry dataset contains synthethic event logs that spans over multiple product types. Each row corresponds to a single telemetry event, which mimics real deployment scenarios originate from devices. Here are the following attributes: \\
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{l p{10cm}}
+\toprule
+\textbf{Attribute} & \textbf{Description} \\
+\midrule
+Product Type & A categorical variable that indicates the type of product. Categories include \textbf{A}, \textbf{B}, \textbf{C}, \textbf{D}, \textbf{E}, \textbf{F}, and \textbf{Others} \\ 
+Event Type & Specifies the type of system or user-triggered event. Values include \textbf{open}, \textbf{close}, \textbf{save}, \textbf{reset}, and \textbf{error} \\
+Time of Event & Timestamp recording when each event occurred. All events fall within the period \textbf{May 1, 2024, to July 31, 2024} \\
+User ID & Anonymized identifier representing the user associated with event. \\
+\bottomrule
+\end{tabular}
+\caption{Data Attributes}
+\end{table}
+
+\newpage
+
+\makereference
+
+\nocite{*}
+\bibliography{reference}
+\bibliographystyle{style/dsc180bibstyle}
+
+\end{document}

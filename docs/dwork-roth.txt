@@ -1,0 +1,2274 @@
+1
+The Promise of Differential Privacy
+“Differential privacy” describes a promise, made by a data holder, or
+curator, to a data subject: “You will not be affected, adversely or oth-
+erwise, by allowing your data to be used in any study or analysis,
+no matter what other studies, data sets, or information sources, are
+available.” At their best, differentially private database mechanisms
+can make confidential data widely available for accurate data analysis,
+without resorting to data clean rooms, data usage agreements, data pro-
+tection plans, or restricted views. Nonetheless, data utility will eventu-
+ally be consumed: the Fundamental Law of Information Recovery states
+that overly accurate answers to too many questions will destroy privacy
+in a spectacular way.1 The goal of algorithmic research on differential
+privacy is to postpone this inevitability as long as possible.
+Differential privacy addresses the paradox of learning nothing about
+an individual while learning useful information about a population. A
+medical database may teach us that smoking causes cancer, affecting
+an insurance company’s view of a smoker’s long-term medical costs.
+Has the smoker been harmed by the analysis? Perhaps — his insurance
+1This result, proved in Section 8.1, applies to all techniques for privacy-preserving
+data analysis, and not just to differential privacy.
+5
+6 The Promise of Differential Privacy
+premiums may rise, if the insurer knows he smokes. He may also be
+helped — learning of his health risks, he enters a smoking cessation
+program. Has the smoker’s privacy been compromised? It is certainly
+the case that more is known about him after the study than was known
+before, but was his information “leaked”? Differential privacy will take
+the view that it was not, with the rationale that the impact on the
+smoker is the same independent of whether or not he was in the study.
+It is the conclusions reached in the study that affect the smoker, not
+his presence or absence in the data set.
+Differential privacy ensures that the same conclusions, for example,
+smoking causes cancer, will be reached, independent of whether any
+individual opts into or opts out of the data set. Specifically, it ensures
+that any sequence of outputs (responses to queries) is “essentially”
+equally likely to occur, independent of the presence or absence of any
+individual. Here, the probabilities are taken over random choices made
+by the privacy mechanism (something controlled by the data curator),
+and the term “essentially” is captured by a parameter, ε. A smaller ε
+will yield better privacy (and less accurate responses).
+Differential privacy is a definition, not an algorithm. For a given
+computational task T and a given value of ε there will be many differ-
+entially private algorithms for achieving T in an ε-differentially private
+manner. Some will have better accuracy than others. When ε is small,
+finding a highly accurate ε-differentially private algorithm for T can be
+difficult, much as finding a numerically stable algorithm for a specific
+computational task can require effort.
+1.1 Privacy-preserving data analysis
+Differential privacy is a definition of privacy tailored to the problem
+of privacy-preserving data analysis. We briefly address some concerns
+with other approaches to this problem.
+Data Cannot be Fully Anonymized and Remain Useful. Generally
+speaking, the richer the data, the more interesting and useful it is.
+This has led to notions of “anonymization” and “removal of person-
+ally identifiable information,” where the hope is that portions of the
+1.1. Privacy-preserving data analysis 7
+data records can be suppressed and the remainder published and used
+for analysis. However, the richness of the data enables “naming” an
+individual by a sometimes surprising collection of fields, or attributes,
+such as the combination of zip code, date of birth, and sex, or even the
+names of three movies and the approximate dates on which an indi-
+vidual watched these movies. This “naming” capability can be used in
+a linkage attack to match “anonymized” records with non-anonymized
+records in a different dataset. Thus, the medical records of the gover-
+nor of Massachussetts were identified by matching anonymized medical
+encounter data with (publicly available) voter registration records, and
+Netflix subscribers whose viewing histories were contained in a collec-
+tion of anonymized movie records published by Netflix as training data
+for a competition on recommendation were identified by linkage with
+the Internet Movie Database (IMDb).
+Differential privacy neutralizes linkage attacks: since being differ-
+entially private is a property of the data access mechanism, and is
+unrelated to the presence or absence of auxiliary information available
+to the adversary, access to the IMDb would no more permit a linkage
+attack to someone whose history is in the Netflix training set than to
+someone not in the training set.
+Re-Identification of “Anonymized” Records is Not the Only Risk. Re-
+identification of “anonymized” data records is clearly undesirable, not
+only because of the re-identification per se, which certainly reveals
+membership in the data set, but also because the record may contain
+compromising information that, were it tied to an individual, could
+cause harm. A collection of medical encounter records from a specific
+urgent care center on a given date may list only a small number of
+distinct complaints or diagnoses. The additional information that a
+neighbor visited the facility on the date in question gives a fairly nar-
+row range of possible diagnoses for the neighbor’s condition. The fact
+that it may not be possible to match a specific record to the neighbor
+provides minimal privacy protection to the neighbor.
+Queries Over Large Sets are Not Protective. Questions about specific
+individuals cannot be safely answered with accuracy, and indeed one
+8 The Promise of Differential Privacy
+might wish to reject them out of hand (were it computationally fea-
+sible to recognize them). Forcing queries to be over large sets is not
+a panacea, as shown by the following differencing attack. Suppose it
+is known that Mr. X is in a certain medical database. Taken together,
+the answers to the two large queries “How many people in the database
+have the sickle cell trait?” and “How many people, not named X, in the
+database have the sickle cell trait?” yield the sickle cell status of Mr. X.
+Query Auditing Is Problematic. One might be tempted to audit the
+sequence of queries and responses, with the goal of interdicting any
+response if, in light of the history, answering the current query would
+compromise privacy. For example, the auditor may be on the lookout
+for pairs of queries that would constitute a differencing attack. There
+are two difficulties with this approach. First, it is possible that refusing
+to answer a query is itself disclosive. Second, query auditing can be
+computationally infeasible; indeed if the query language is sufficiently
+rich there may not even exist an algorithmic procedure for deciding if
+a pair of queries constitutes a differencing attack.
+Summary Statistics are Not “Safe.” In some sense, the failure of
+summary statistics as a privacy solution concept is immediate from
+the differencing attack just described. Other problems with summary
+statistics include a variety of reconstruction attacks against a database
+in which each individual has a “secret bit” to be protected. The utility
+goal may be to permit, for example, questions of the form “How many
+people satisfying property P have secret bit value 1?” The goal of the
+adversary, on the other hand, is to significantly increase his chance
+of guessing the secret bits of individuals. The reconstruction attacks
+described in Section 8.1 show the difficulty of protecting against even
+a linear number of queries of this type: unless sufficient inaccuracy is
+introduced almost all the secret bits can be reconstructed.
+A striking illustration of the risks of releasing summary statistics
+is in an application of a statistical technique, originally intended for
+confirming or refuting the presence of an individual’s DNA in a foren-
+sic mix, to ruling an individual in or out of a genome-wide association
+study. According to a Web site of the Human Genome Project, “Single
+nucleotide polymorphisms, or SNPs (pronounced “snips”), are DNA
+.1. Privacy-preserving data analysis 9
+sequence variations that occur when a single nucleotide (A,T,C, or G)
+in the genome sequence is altered. For example a SNP might change
+the DNA sequence AAGGCTAA to ATGGCTAA.” In this case we say
+there are two alleles: A and T. For such a SNP we can ask, given a
+particular reference population, what are the frequencies of each of the
+two possible alleles? Given the allele frequencies for SNPs in the ref-
+erence population, we can examine how these frequencies may differ
+for a subpopulation that has a particular disease (the “case” group),
+looking for alleles that are associated with the disease. For this reason,
+genome-wide association studies may contain the allele frequencies of
+the case group for large numbers of SNPs. By definition, these allele
+frequencies are only aggregated statistics, and the (erroneous) assump-
+tion has been that, by virtue of this aggregation, they preserve privacy.
+However, given the genomic data of an individual, it is theoretically
+possible to determine if the individual is in the case group (and, there-
+fore, has the disease). In response, the National Institutes of Health
+and Wellcome Trust terminated public access to aggregate frequency
+data from the studies they fund.
+This is a challenging problem even for differential privacy, due to
+the large number — hundreds of thousands or even one million — of
+measurements involved and the relatively small number of individuals
+in any case group.
+“Ordinary” Facts are Not “OK.” Revealing “ordinary” facts, such as
+purchasing bread, may be problematic if a data subject is followed over
+time. For example, consider Mr. T, who regularly buys bread, year after
+year, until suddenly switching to rarely buying bread. An analyst might
+conclude Mr. T most likely has been diagnosed with Type 2 diabetes.
+The analyst might be correct, or might be incorrect; either way Mr. T
+is harmed.
+“Just a Few.” In some cases a particular technique may in fact provide
+privacy protection for “typical” members of a data set, or more gen-
+erally, “most” members. In such cases one often hears the argument
+that the technique is adequate, as it compromises the privacy of “just
+a few” participants. Setting aside the concern that outliers may be pre-
+cisely those people for whom privacy is most important, the “just a few”
+10 The Promise of Differential Privacy
+philosophy is not intrinsically without merit: there is a social judgment,
+a weighing of costs and benefits, to be made. A well-articulated defini-
+tion of privacy consistent with the “just a few” philosophy has yet to
+be developed; however, for a single data set, “just a few” privacy can be
+achieved by randomly selecting a subset of rows and releasing them in
+their entirety (Lemma 4.3, Section 4). Sampling bounds describing the
+quality of statistical analysis that can be carried out on random sub-
+samples govern the number of rows to be released. Differential privacy
+provides an alternative when the “just a few” philosophy is rejected.
+1.2 Bibliographic notes
+Sweeney [81] linked voter registration records to “anonymized” medical
+encounter data; Narayanan and Shmatikov carried out a linkage attack
+against anonymized ranking data published by Netflix [65]. The work
+on presence in a forensic mix is due to Homer et al. [46]. The first
+reconstruction attacks were due to Dinur and Nissim [18].
+2
+Basic Terms
+This section motivates and presents the formal definition of differential
+privacy, and enumerates some of its key properties.
+2.1 The model of computation
+We assume the existence of a trusted and trustworthy curator who
+holds the data of individuals in a database D, typically comprised of
+some number n of rows. The intuition is that each row contains the
+data of a single individual, and, still speaking intuitively, the privacy
+goal is to simultaneously protect every individual row while permitting
+statistical analysis of the database as a whole.
+In the non-interactive, or offline, model the curator produces some
+kind of object, such as a “synthetic database,” collection of summary
+statistics, or “sanitized database” once and for all. After this release the
+curator plays no further role and the original data may be destroyed.
+A query is a function to be applied to a database. The interactive,
+or online, model permits the data analyst to ask queries adaptively,
+deciding which query to pose next based on the observed responses to
+previous queries.
+11
+12 Basic Terms
+The trusted curator can be replaced by a protocol run by the set
+of individuals, using the cryptographic techniques for secure multi-
+party protocols, but for the most part we will not be appealing to
+cryptographic assumptions. Section 12 describes this and other models
+studied in the literature.
+When all the queries are known in advance the non-interactive
+model should give the best accuracy, as it is able to correlate noise
+knowing the structure of the queries. In contrast, when no information
+about the queries is known in advance, the non-interactive model poses
+severe challenges, as it must provide answers to all possible queries.
+As we will see, to ensure privacy, or even to prevent privacy catastro-
+phes, accuracy will necessarily deteriorate with the number of questions
+asked, and providing accurate answers to all possible questions will be
+infeasible.
+A privacy mechanism, or simply a mechanism, is an algorithm that
+takes as input a database, a universe X of data types (the set of all
+possible database rows), random bits, and, optionally, a set of queries,
+and produces an output string. The hope is that the output string can
+be decoded to produce relatively accurate answers to the queries, if
+the latter are present. If no queries are presented then we are in the
+non-interactive case, and the hope is that the output string can be
+interpreted to provide answers to future queries.
+In some cases we may require that the output string be a synthetic
+database. This is a multiset drawn from the universe X of possible
+database rows. The decoding method in this case is to carry out the
+query on the synthetic database and then to apply some sort of simple
+transformation, such as multiplying by a scaling factor, to obtain an
+approximation to the the true answer to the query.
+2.2 Towards defining private data analysis
+A natural approach to defining privacy in the context of data analy-
+sis is to require that the analyst knows no more about any individual
+in the data set after the analysis is completed than she knew before
+the analysis was begun. It is also natural to formalize this goal by
+2.2. Towards defining private data analysis 13
+requiring that the adversary’s prior and posterior views about an indi-
+vidual (i.e., before and after having access to the database) shouldn’t
+be “too different,” or that access to the database shouldn’t change the
+adversary’s views about any individual “too much.” However, if the
+database teaches anything at all, this notion of privacy is unachiev-
+able. For example, suppose the adversary’s (incorrect) prior view is
+that everyone has 2 left feet. Access to the statistical database teaches
+that almost everyone has one left foot and one right foot. The adversary
+now has a very different view of whether or not any given respondent
+has two left feet.
+Part of the appeal of before/after, or “nothing is learned,” approach
+to defining privacy is the intuition that if nothing is learned about
+an individual then the individual cannot be harmed by the analysis.
+However, the “smoking causes cancer” example shows this intuition to
+be flawed; the culprit is auxiliary information (Mr. X smokes).
+The “nothing is learned” approach to defining privacy is reminiscent
+of semantic security for a cryptosystem. Roughly speaking, semantic
+security says that nothing is learned about the plaintext (the unen-
+crypted message) from the ciphertext. That is, anything known about
+the plaintext after seeing the ciphertext was known before seeing the
+ciphertext. So if there is auxiliary information saying that the cipher-
+text is an encryption of either “dog” or “cat,” then the ciphertext
+leaks no further information about which of “dog” or “cat” has been
+encrypted. Formally, this is modeled by comparing the ability of the
+eavesdropper to guess which of “dog” and “cat” has been encrypted
+to the ability of a so-called adversary simulator, who has the auxil-
+iary information but does not have access to the ciphertext, to guess
+the same thing. If for every eavesdropping adversary, and all auxiliary
+information (to which both the adversary and the simulator are privy),
+the adversary simulator has essentially the same odds of guessing as
+does the eavesdropper, then the system enjoys semantic security. Of
+course, for the system to be useful, the legitimate receiver must be able
+to correctly decrypt the message; otherwise semantic security can be
+achieved trivially.
+We know that, under standard computational assumptions, seman-
+tically secure cryptosystems exist, so why can we not build semantically
+14 Basic Terms
+secure private database mechanisms that yield answers to queries while
+keeping individual rows secret?
+First, the analogy is not perfect: in a semantically secure cryp-
+tosystem there are three parties: the message sender (who encrypts
+the plaintext message), the message receiver (who decrypts the cipher-
+text), and the eavesdropper (who is frustrated by her inability to learn
+anything about the plaintext that she did not already know before
+it was sent). In contrast, in the setting of private data analysis there
+are only two parties: the curator, who runs the privacy mechanism
+(analogous to the sender) and the data analyst, who receives the infor-
+mative responses to queries (like the message receiver) and also tries to
+squeeze out privacy-compromising information about individuals (like
+the eavesdropper). Because the legitimate receiver is the same party as
+the snooping adversary, the analogy to encryption is flawed: denying
+all information to the adversary means denying all information to the
+data analyst.
+Second, as with an encryption scheme, we require the privacy mech-
+anism to be useful, which means that it teaches the analyst something
+she did not previously know. This teaching is unavailable to an adver-
+sary simulator; that is, no simulator can “predict” what the analyst
+has learned. We can therefore look at the database as a weak source
+of random (unpredictable) bits, from which we can extract some very
+high quality randomness to be used as a random pad. This can be used
+in an encryption technique in which a secret message is added to a
+random value (the “random pad”) in order to produce a string that
+information-theoretically hides the secret. Only someone knowing the
+random pad can learn the secret; any party that knows nothing about
+the pad learns nothing at all about the secret, no matter his or her
+computational power. Given access to the database, the analyst can
+learn the random pad, but the adversary simulator, not given access
+to the database, learns nothing at all about the pad. Thus, given as
+auxiliary information the encryption of a secret using the random pad,
+the analyst can decrypt the secret, but the adversary simulator learns
+nothing at all about the secret. This yields a huge disparity between
+the ability of the adversary/analyst to learn the secret and the ability
+2.3. Formalizing differential privacy 15
+of the adversary simulator to do the same thing, eliminating all hope
+of anything remotely resembling semantic security.
+The obstacle in both the smoking causes cancer example and the
+hope for semantic security is auxiliary information. Clearly, to be
+meaningful, a privacy guarantee must hold even in the context of
+“reasonable” auxiliary knowledge, but separating reasonable from arbi-
+trary auxiliary knowledge is problematic. For example, the analyst
+using a government database might be an employee at a major search
+engine company. What are “reasonable” assumptions about the auxil-
+iary knowledge information available to such a person?
+2.3 Formalizing differential privacy
+We will begin with the technical definition of differential privacy, and
+then go on to interpret it. Differential privacy will provide privacy by
+process; in particular it will introduce randomness. An early exam-
+ple of privacy by randomized process is randomized response, a tech-
+nique developed in the social sciences to collect statistical information
+about embarassing or illegal behavior, captured by having a property P .
+Study participants are told to report whether or not they have prop-
+erty P as follows:
+1. Flip a coin.
+2. If tails, then respond truthfully.
+3. If heads, then flip a second coin and respond “Yes” if heads and
+“No” if tails.
+“Privacy” comes from the plausible deniability of any outcome; in par-
+ticular, if having property P corresponds to engaging in illegal behavior,
+even a “Yes” answer is not incriminating, since this answer occurs with
+probability at least 1/4 whether or not the respondent actually has
+property P . Accuracy comes from an understanding of the noise gener-
+ation procedure (the introduction of spurious “Yes” and “No” answers
+from the randomization): The expected number of “Yes” answers is
+1/4 times the number of participants who do not have property P plus
+3/4 the number having property P . Thus, if p is the true fraction of
+16 Basic Terms
+participants having property P , the expected number of “Yes” answers
+is (1/4)(1 − p) + (3/4)p = (1/4) + p/2. Thus, we can estimate p as twice
+the fraction answering “Yes” minus 1/2, that is, 2((1/4) + p/2) − 1/2.
+Randomization is essential; more precisely, any non-trivial privacy
+guarantee that holds regardless of all present or even future sources
+of auxiliary information, including other databases, studies, Web sites,
+on-line communities, gossip, newspapers, government statistics, and so
+on, requires randomization. This follows from a simple hybrid argu-
+ment, which we now sketch. Suppose, for the sake of contradiction,
+that we have a non-trivial deterministic algorithm. Non-triviality says
+that there exists a query and two databases that yield different out-
+puts under this query. Changing one row at a time we see there exists
+a pair of databases differing only in the value of a single row, on which
+the same query yields different outputs. An adversary knowing that
+the database is one of these two almost identical databases learns the
+value of the data in the unknown row.
+We will therefore need to discuss the input and output space of
+randomized algorithms. Throughout this monograph we work with dis-
+crete probability spaces. Sometimes we will describe our algorithms
+as sampling from continuous distributions, but these should always
+be discretized to finite precision in an appropriately careful way (see
+Remark 2.1 below). In general, a randomized algorithm with domain
+A and (discrete) range B will be associated with a mapping from A to
+the probability simplex over B, denoted ∆(B):
+Definition 2.1 (Probability Simplex). Given a discrete set B, the prob-
+ability simplex over B, denoted ∆(B) is defined to be:
+∆(B) =
+
+
+x ∈ R|B| : xi ≥ 0 for all i and
+|B|
+∑
+i=1
+xi = 1
+
+
+
+Definition 2.2 (Randomized Algorithm). A randomized algorithm M
+with domain A and discrete range B is associated with a mapping
+M : A → ∆(B). On input a ∈ A, the algorithm M outputs M(a) = b
+with probability (M (a))b for each b ∈ B. The probability space is over
+the coin flips of the algorithm M.
+2.3. Formalizing differential privacy 17
+We will think of databases x as being collections of records from a
+universe X . It will often be convenient to represent databases by their
+histograms: x ∈ N|X |, in which each entry xi represents the number of
+elements in the database x of type i ∈ X (we abuse notation slightly, let-
+ting the symbol N denote the set of all non-negative integers, including
+zero). In this representation, a natural measure of the distance between
+two databases x and y will be their `1 distance:
+Definition 2.3 (Distance Between Databases). The `1 norm of a
+database x is denoted ‖x‖1 and is defined to be:
+‖x‖1 =
+|X |
+∑
+i=1
+|xi| .
+The `1 distance between two databases x and y is ‖x − y‖1
+Note that ‖x‖1 is a measure of the size of a database x (i.e., the
+number of records it contains), and ‖x − y‖1 is a measure of how many
+records differ between x and y.
+Databases may also be represented by multisets of rows (elements
+of X ) or even ordered lists of rows, which is a special case of a set,
+where the row number becomes part of the name of the element. In this
+case distance between databases is typically measured by the Hamming
+distance, i.e., the number of rows on which they differ.
+However, unless otherwise noted, we will use the histogram
+representation described above. (Note, however, that even when the
+histogram notation is more mathematically convenient, in actual
+implementations, the multiset representation will often be much more
+concise).
+We are now ready to formally define differential privacy, which intu-
+itively will guarantee that a randomized algorithm behaves similarly on
+similar input databases.
+Definition 2.4 (Differential Privacy). A randomized algorithm M with
+domain N|X | is (ε, δ)-differentially private if for all S ⊆ Range(M) and
+for all x, y ∈ N|X | such that ‖x − y‖1 ≤ 1:
+Pr[M(x) ∈ S] ≤ exp(ε) Pr[M(y) ∈ S] + δ,
+18 Basic Terms
+where the probability space is over the coin flips of the mechanism M.
+If δ = 0, we say that M is ε-differentially private.
+Typically we are interested in values of δ that are less than the
+inverse of any polynomial in the size of the database. In particular,
+values of δ on the order of 1/‖x‖1 are very dangerous: they permit “pre-
+serving privacy” by publishing the complete records of a small number
+of database participants — precisely the “just a few” philosophy dis-
+cussed in Section 1.
+Even when δ is negligible, however, there are theoretical distinc-
+tions between (ε, 0)- and (ε, δ)-differential privacy. Chief among these
+is what amounts to a switch of quantification order. (ε, 0)-differential
+privacy ensures that, for every run of the mechanism M(x), the out-
+put observed is (almost) equally likely to be observed on every neigh-
+boring database, simultaneously. In contrast (ε, δ)-differential privacy
+says that for every pair of neighboring databases x, y, it is extremely
+unlikely that, ex post facto the observed value M(x) will be much more
+or much less likely to be generated when the database is x than when
+the database is y. However, given an output ξ ∼ M(x) it may be possi-
+ble to find a database y such that ξ is much more likely to be produced
+on y than it is when the database is x. That is, the mass of ξ in the
+distribution M(y) may be substantially larger than its mass in the
+distribution M(x).
+The quantity
+L(ξ)
+M(x)‖M(y) = ln
+( Pr[M(x) = ξ]
+Pr[M(y) = ξ]
+)
+is important to us; we refer to it as the privacy loss incurred by observ-
+ing ξ. This loss might be positive (when an event is more likely under x
+than under y) or it might be negative (when an event is more likely
+under y than under x). As we will see in Lemma 3.17, (ε, δ)-differential
+privacy ensures that for all adjacent x, y, the absolute value of the pri-
+vacy loss will be bounded by ε with probability at least 1−δ. As always,
+the probability space is over the coins of the mechanism M.
+Differential privacy is immune to post-processing: A data analyst,
+without additional knowledge about the private database, cannot com-
+pute a function of the output of a private algorithm M and make it
+2.3. Formalizing differential privacy 19
+less differentially private. That is, if an algorithm protects an individ-
+ual’s privacy, then a data analyst cannot increase privacy loss — either
+under the formal definition or even in any intuitive sense — simply by
+sitting in a corner and thinking about the output of the algorithm. For-
+mally, the composition of a data-independent mapping f with an (ε, δ)-
+differentially private algorithm M is also (ε, δ) differentially private:
+Proposition 2.1 (Post-Processing). Let M : N|X | → R be a randomized
+algorithm that is (ε, δ)-differentially private. Let f : R → R′ be an
+arbitrary randomized mapping. Then f ◦ M : N|X | → R′ is (ε, δ)-
+differentially private.
+Proof. We prove the proposition for a deterministic function
+f : R → R′. The result then follows because any randomized mapping
+can be decomposed into a convex combination of deterministic func-
+tions, and a convex combination of differentially private mechanisms is
+differentially private.
+Fix any pair of neighboring databases x, y with ‖x − y‖1 ≤ 1, and
+fix any event S ⊆ R′. Let T = {r ∈ R : f (r) ∈ S}. We then have:
+Pr[f (M(x)) ∈ S] = Pr[M(x) ∈ T ]
+≤ exp(ε) Pr[M(y) ∈ T ] + δ
+= exp(ε) Pr[f (M(y)) ∈ S] + δ
+which was what we wanted.
+It follows immediately from Definition 2.4 that (ε, 0)-differential pri-
+vacy composes in a straightforward way: the composition of two (ε, 0)-
+differentially private mechanisms is (2ε, 0)-differentially private. More
+generally (Theorem 3.16), “the epsilons and the deltas add up”: the
+composition of k differentially private mechanisms, where the ith mech-
+anism is (εi, δi)-differentially private, for 1 ≤ i ≤ k, is (∑
+i εi, ∑
+i δi)-
+differentially private.
+Group privacy for (ε, 0)-differentially private mechanisms also fol-
+lows immediately from Definition 2.4, with the strength of the privacy
+guarantee drops linearly with the size of the group.
+20 Basic Terms
+Theorem 2.2. Any (ε, 0)-differentially private mechanism M is (kε, 0)-
+differentially private for groups of size k. That is, for all ‖x − y‖1 ≤ k
+and all S ⊆ Range(M)
+Pr[M(x) ∈ S] ≤ exp(kε) Pr[M(y) ∈ S],
+where the probability space is over the coin flips of the mechanism M.
+This addresses, for example, the question of privacy in surveys that
+include multiple family members.1
+More generally, composition and group privacy are not the same
+thing and the improved composition bounds in Section 3.5.2 (Theo-
+rem 3.20), which substantially improve upon the factor of k, do not —
+and cannot — yield the same gains for group privacy, even when δ = 0.
+2.3.1 What differential privacy promises
+An Economic View. Differential privacy promises to protect individ-
+uals from any additional harm that they might face due to their data
+being in the private database x that they would not have faced had
+their data not been part of x. Although individuals may indeed face
+harm once the results M(x) of a differentially private mechanism M
+have been released, differential privacy promises that the probability of
+harm was not significantly increased by their choice to participate. This
+is a very utilitarian definition of privacy, because when an individual is
+deciding whether or not to include her data in a database that will be
+used in a differentially private manner, it is exactly this difference that
+she is considering: the probability of harm given that she participates,
+as compared to the probability of harm given that she does not partic-
+ipate. She has no control over the remaining contents of the database.
+Given the promise of differential privacy, she is assured that she should
+1However, as the group gets larger, the privacy guarantee deteriorates, and this
+is what we want: clearly, if we replace an entire surveyed population, say, of cancer
+patients, with a completely different group of respondents, say, healthy teenagers,
+we should get different answers to queries about the fraction of respondents who
+regularly run three miles each day. Although something similar holds for (ε, δ)-
+differential privacy, the approximation term δ takes a big hit, and we only obtain
+(kε, ke(k−1)εδ)-differential privacy for groups of size k.
+2.3. Formalizing differential privacy 21
+be almost indifferent between participating and not, from the point of
+view of future harm. Given any incentive — from altruism to monetary
+reward — differential privacy may convince her to allow her data to
+be used. This intuition can be formalized in a utility-theoretic sense,
+which we here briefly sketch.
+Consider an individual i who has arbitrary preferences over the
+set of all possible future events, which we denote by A. These pref-
+erences are expressed by a utility function ui : A → R≥0, and we
+say that individual i experiences utility ui(a) in the event that a ∈ A
+comes to pass. Suppose that x ∈ N|X | is a data-set containing indi-
+vidual is private data, and that M is an ε-differentially private algo-
+rithm. Let y be a data-set that is identical to x except that it does not
+include the data of individual i (in particular, ‖x − y‖1 = 1), and let
+f : Range(M) → ∆(A) be the (arbitrary) function that determines the
+distribution over future events A, conditioned on the output of mech-
+anism M . By the guarantee of differential privacy, together with the
+resilience to arbitrary post-processing guaranteed by Proposition 2.1,
+we have:
+Ea∼f (M(x))[ui(a)] = ∑
+a∈A
+ui(a) · Pr
+f (M(x))[a]
+≤ ∑
+a∈A
+ui(a) · exp(ε) Pr
+f (M(y))[a]
+= exp(ε)Ea∼f (M(y))[ui(a)]
+Similarly,
+Ea∼f (M(x))[ui(a)] ≥ exp(−ε)Ea∼f (M(y))[ui(a)].
+Hence, by promising a guarantee of ε-differential privacy, a data analyst
+can promise an individual that his expected future utility will not be
+harmed by more than an exp(ε) ≈ (1+ε) factor. Note that this promise
+holds independently of the individual is utility function ui, and holds
+simultaneously for multiple individuals who may have completely dif-
+ferent utility functions.
+22 Basic Terms
+2.3.2 What differential privacy does not promise
+As we saw in the Smoking Causes Cancer example, while differential
+privacy is an extremely strong guarantee, it does not promise uncon-
+ditional freedom from harm. Nor does it create privacy where none
+previously exists. More generally, differential privacy does not guaran-
+tee that what one believes to be one’s secrets will remain secret. It
+merely ensures that one’s participation in a survey will not in itself
+be disclosed, nor will participation lead to disclosure of any specifics
+that one has contributed to the survey. It is very possible that conclu-
+sions drawn from the survey may reflect statistical information about
+an individual. A health survey intended to discover early indicators of
+a particular ailment may produce strong, even conclusive results; that
+these conclusions hold for a given individual is not evidence of a differ-
+ential privacy violation; the individual may not even have participated
+in the survey (again, differential privacy ensures that these conclusive
+results would be obtained with very similar probability whether or not
+the individual participated in the survey). In particular, if the survey
+teaches us that specific private attributes correlate strongly with pub-
+licly observable attributes, this is not a violation of differential privacy,
+since this same correlation would be observed with almost the same
+probability independent of the presence or absence of any respondent.
+Qualitative Properties of Differential Privacy. Having introduced
+and formally defined differential privacy, we recaptiluate its key desir-
+able qualities.
+1. Protection against arbitrary risks, moving beyond protection
+against re-identification.
+2. Automatic neutralization of linkage attacks, including all those
+attempted with all past, present, and future datasets and other
+forms and sources of auxiliary information.
+3. Quantification of privacy loss. Differential privacy is not a binary
+concept, and has a measure of privacy loss. This permits compar-
+isons among different techniques: for a fixed bound on privacy
+loss, which technique provides better accuracy? For a fixed accu-
+racy, which technique provides better privacy?
+2.3. Formalizing differential privacy 23
+4. Composition. Perhaps most crucially, the quantification of loss
+also permits the analysis and control of cumulative privacy loss
+over multiple computations. Understanding the behavior of differ-
+entially private mechanisms under composition enables the design
+and analysis of complex differentially private algorithms from
+simpler differentially private building blocks.
+5. Group Privacy. Differential privacy permits the analysis and con-
+trol of privacy loss incurred by groups, such as families.
+6. Closure Under Post-Processing Differential privacy is immune to
+post-processing: A data analyst, without additional knowledge
+about the private database, cannot compute a function of the
+output of a differentially private algorithm M and make it less
+differentially private. That is, a data analyst cannot increase pri-
+vacy loss, either under the formal definition or even in any intu-
+itive sense, simply by sitting in a corner and thinking about the
+output of the algorithm, no matter what auxiliary information is
+available.
+These are the signal attributes of differential privacy. Can we prove
+a converse? That is, do these attributes, or some subset thereof, imply
+differential privacy? Can differential privacy be weakened in these
+respects and still be meaningful? These are open questions.
+2.3.3 Final remarks on the definition
+The Granularity of Privacy. Claims of differential privacy should be
+carefully scrutinized to ascertain the level of granularity at which pri-
+vacy is being promised. Differential privacy promises that the behavior
+of an algorithm will be roughly unchanged even if a single entry in
+the database is modified. But what constitutes a single entry in the
+database? Consider for example a database that takes the form of a
+graph. Such a database might encode a social network: each individual
+i ∈ [n] is represented by a vertex in the graph, and friendships between
+individuals are represented by edges.
+We could consider differential privacy at a level of granularity cor-
+responding to individuals: that is, we could require that differentially
+24 Basic Terms
+private algorithms be insensitive to the addition or removal of any ver-
+tex from the graph. This gives a strong privacy guarantee, but might in
+fact be stronger than we need. the addition or removal of a single vertex
+could after all add or remove up to n edges in the graph. Depending
+on what it is we hope to learn from the graph, insensitivity to n edge
+removals might be an impossible constraint to meet.
+We could on the other hand consider differential privacy at a level
+of granularity corresponding to edges, and ask our algorithms to be
+insensitive only to the addition or removal of single, or small numbers
+of, edges from the graph. This is of course a weaker guarantee, but
+might still be sufficient for some purposes. Informally speaking, if we
+promise ε-differential privacy at the level of a single edge, then no data
+analyst should be able to conclude anything about the existence of any
+subset of 1/ε edges in the graph. In some circumstances, large groups
+of social contacts might not be considered sensitive information: for
+example, an individual might not feel the need to hide the fact that
+the majority of his contacts are with individuals in his city or workplace,
+because where he lives and where he works are public information. On
+the other hand, there might be a small number of social contacts whose
+existence is highly sensitive (for example a prospective new employer,
+or an intimate friend). In this case, edge privacy should be sufficient
+to protect sensitive information, while still allowing a fuller analysis of
+the data than vertex privacy. Edge privacy will protect such an indi-
+vidual’s sensitive information provided that he has fewer than 1/ε such
+friends.
+As another example, a differentially private movie recommendation
+system can be designed to protect the data in the training set at the
+“event” level of single movies, hiding the viewing/rating of any single
+movie but not, say, hiding an individual’s enthusiasm for cowboy west-
+erns or gore, or at the “user” level of an individual’s entire viewing and
+rating history.
+All Small Epsilons Are Alike. When ε is small, (ε, 0)-differential
+privacy asserts that for all pairs of adjacent databases x, y and all
+outputs o, an adversary cannot distinguish which is the true database
+2.3. Formalizing differential privacy 25
+on the basis of observing o. When ε is small, failing to be (ε, 0)-
+differentially private is not necessarily alarming — for example, the
+mechanism may be (2ε, 0)-differentially private. The nature of the pri-
+vacy guarantees with differing but small epsilons are quite similar.
+But what of large values for ε? Failure to be (15, 0)-differentially pri-
+vate merely says there exist neighboring databases and an output o
+for which the ratio of probabilities of observing o conditioned on the
+database being, respectively, x or y, is large. An output of o might be
+very unlikely (this is addressed by (ε, δ)-differential privacy); databases
+x and y might be terribly contrived and ulikely to occur in the “real
+world”; the adversary may not have the right auxiliary information to
+recognize that a revealing output has occurred; or may not know enough
+about the database(s) to determine the value of their symmetric differ-
+ence. Thus, much as a weak cryptosystem may leak anything from only
+the least significant bit of a message to the complete decryption key,
+the failure to be (ε, 0)- or (ε, δ)-differentially private may range from
+effectively meaningless privacy breaches to complete revelation of the
+entire database. A large epsilon is large after its own fashion.
+A Few Additional Formalisms. Our privacy mechanism M will
+often take some auxiliary parameters w as input, in addition to the
+database x. For example, w may specify a query qw on the database x,
+or a collection Qw of queries. The mechanism M(w, x) might (respec-
+tively) respond with a differentially private approximation to qw(x) or
+to some or all of the queries in Qw. For all δ ≥ 0, we say that a mech-
+anism M(·, ·) satisfies (ε, δ)-differential privacy if for every w, M(w, ·)
+satisfies (ε, δ)-differential privacy.
+Another example of a parameter that may be included in w is a
+security parameter κ to govern how small δ = δ(κ) should be. That
+is, M(κ, ·) should be (ε, δ(κ)) differentially private for all κ. Typically,
+and throughout this monograph, we require that δ be a negligible func-
+tion in κ, i.e., δ = κ−ω(1). Thus, we think of δ as being cryptograph-
+ically small, whereas ε is typically thought of as a moderately small
+constant.
+In the case where the auxiliary parameter w specifies a collec-
+tion Qw = {q : X n → R} of queries, we call the mechanism M a
+26 Basic Terms
+synopsis generator. A synopsis generator outputs a (differentially
+private) synopsis A which can be used to compute answers to all the
+queries in Qw. That is, we require that there exists a reconstruction
+procedure R such that for each input v specifying a query qv ∈ Qw,
+the reconstruction procedure outputs R(A, v) ∈ R. Typically, we
+will require that with high probability M produces a synopsis A
+such that the reconstruction procedure, using A, computes accurate
+answers. That is, for all or most (weighted by some distribution) of the
+queries qv ∈ Qw, the error |R(A, v) − qv(x)| will be bounded. We will
+occasionally abuse notation and refer to the reconstruction procedure
+taking as input the actual query q (rather than some representation v
+of it), and outputting R(A, q).
+A special case of a synopsis is a synthetic database. As the name
+suggests, the rows of a synthetic database are of the same type as
+rows of the original database. An advantage to synthetic databases is
+that they may be analyzed using the same software that the analyst
+would use on the original database, obviating the need for a special
+reconstruction procedure R.
+Remark 2.1. Considerable care must be taken when programming real-
+valued mechanisms, such as the Laplace mechanism, due to subtleties
+in the implementation of floating point numbers. Otherwise differential
+privacy can be destroyed, as outputs with non-zero probability on a
+database x, may, because of rounding, have zero probability on adja-
+cent databases y. This is just one way in which the implementation of
+floating point requires scrutiny in the context of differential privacy,
+and it is not unique.
+2.4 Bibliographic notes
+The definition of differential privacy is due to Dwork et al. [23]; the
+precise formulation used here and in the literature first appears in [20]
+and is due to Dwork and McSherry. The term “differential privacy”
+was coined by Michael Schroeder. The impossibility of semantic secu-
+rity is due to Dwork and Naor [25]. Composition and group privacy
+for (ε, 0)-differentially private mechanisms is first addressed in [23].
+2.4. Bibliographic notes 27
+Composition for (ε, δ)-differential privacy was first addressed in [21]
+(but see the corrected proof in Appendix B, due to Dwork and Lei [22]).
+The vulnerability of differential privacy to inappropriate implementa-
+tions of floating point numbers was observed by Mironov, who proposed
+a mitigation [63].
+3
+Basic Techniques and Composition Theorems
+After reviewing a few probabilistic tools, we present the Laplace mech-
+anism, which gives differential privacy for real (vector) valued queries.
+An application of this leads naturally to the exponential mechanism,
+which is a method for differentially private selection from a discrete
+set of candidate outputs. We then analyze the cumulative privacy
+loss incurred by composing multiple differentially private mechanisms.
+Finally we give a method — the sparse vector technique — for pri-
+vately reporting the outcomes of a potentially very large number of
+computations, provided that only a few are “significant.”
+In this section, we describe some of the most basic techniques in
+differential privacy that we will come back to use again and again. The
+techniques described here form the basic building blocks for all of the
+other algorithms that we will develop.
+3.1 Useful probabilistic tools
+The following concentration inequalities will frequently be useful. We
+state them in easy to use forms rather than in their strongest forms.
+28
+3.2. Randomized response 29
+Theorem 3.1 (Additive Chernoff Bound). Let X1, . . . , Xm be indepen-
+dent random variables bounded such that 0 ≤ Xi ≤ 1 for all i. Let
+S = 1
+m
+∑m
+i=1 Xi denote their mean, and let μ = E[S] denote their
+expected mean. Then:
+Pr[S > μ + ε] ≤ e−2mε2
+Pr[S < μ − ε] ≤ e−2mε2
+Theorem 3.2 (Multiplicative Chernoff Bound). Let X1, . . . , Xm be inde-
+pendent random variables bounded such that 0 ≤ Xi ≤ 1 for all i. Let
+S = 1
+m
+∑m
+i=1 Xi denote their mean, and let μ = E[S] denote their
+expected mean. Then:
+Pr[S > (1 + ε)μ] ≤ e−mμε2/3
+Pr[S < (1 − ε)μ] ≤ e−mμε2/2
+When we do not have independent random variables, all is not lost.
+We may still apply Azuma’s inequality:
+Theorem 3.3 (Azuma’s Inequality). Let f be a function of m random
+variables X1, . . . , Xm, each Xi taking values from a set Ai such that
+E[f ] is bounded. Let ci denote the maximum effect of Xi on f — i.e.,
+for all ai, a′
+i ∈ Ai:
+∣
+∣E[f |X1, . . . , Xi−1, Xi = ai] − E[f |X1, . . . , Xi−1, Xi = a′
+i]∣
+∣ ≤ ci
+Then:
+Pr [f (X1, . . . , Xm) ≥ E[f ] + t] ≤ exp
+(
+− 2t2
+∑m
+i=1 c2
+i
+)
+Theorem 3.4 (Stirling’s Approximation). n! can be approximated by√2nπ(n/e)n:
+√2nπ(n/e)ne1/(12n+1) < n! < √2nπ(n/e)ne1/(12n).
+3.2 Randomized response
+Let us recall the simple randomized response mechanism, described
+in Section 2, for evaluating the frequency of embarrassing or illegal
+30 Basic Techniques and Composition Theorems
+behaviors. Let XYZ be such an activity. Faced with the query, “Have
+you engaged in XYZ in the past week?” the respondent is instructed
+to perform the following steps:
+1. Flip a coin.
+2. If tails, then respond truthfully.
+3. If heads, then flip a second coin and respond “Yes” if heads and
+“No” if tails.
+The intuition behind randomized response is that it provides “plau-
+sible deniability.” For example, a response of “Yes” may have been
+offered because the first and second coin flips were both Heads, which
+occurs with probability 1/4. In other words, privacy is obtained by pro-
+cess, there are no “good” or “bad” responses. The process by which
+the responses are obtained affects how they may legitimately be inter-
+preted. As the next claim shows, randomized response is differentially
+private.
+Claim 3.5. The version of randomized response described above is
+(ln 3, 0)-differentially private.
+Proof. Fix a respondent. A case analysis shows that Pr[Response =
+Yes|Truth = Yes] = 3/4. Specifically, when the truth is “Yes” the
+outcome will be “Yes” if the first coin comes up tails (probabil-
+ity 1/2) or the first and second come up heads (probability 1/4)),
+while Pr[Response = Yes|Truth = No] = 1/4 (first comes up heads and
+second comes up tails; probability 1/4). Applying similar reasoning to
+the case of a “No” answer, we obtain:
+Pr[Response = Yes|Truth = Yes]
+Pr[Response = Yes|Truth = No]
+= 3/4
+1/4 = Pr[Response = No|Truth = No]
+Pr[Response = No|Truth = Yes] = 3.
+3.3 The laplace mechanism
+Numeric queries, functions f : N|X | → Rk, are one of the most fun-
+damental types of database queries. These queries map databases to k
+3.3. The laplace mechanism 31
+real numbers. One of the important parameters that will determine just
+how accurately we can answer such queries is their `1 sensitivity:
+Definition 3.1 (`1-sensitivity). The `1-sensitivity of a function f :
+N|X | → Rk is:
+∆f = max
+x,y∈N|X |
+‖x−y‖1=1
+‖f (x) − f (y)‖1.
+The `1 sensitivity of a function f captures the magnitude by which
+a single individual’s data can change the function f in the worst case,
+and therefore, intuitively, the uncertainty in the response that we must
+introduce in order to hide the participation of a single individual.
+Indeed, we will formalize this intuition: the sensitivity of a function
+gives an upper bound on how much we must perturb its output to pre-
+serve privacy. One noise distribution naturally lends itself to differential
+privacy.
+Definition 3.2 (The Laplace Distribution). The Laplace Distribution
+(centered at 0) with scale b is the distribution with probability density
+function:
+Lap(x|b) = 1
+2b exp
+(
+− |x|
+b
+)
+.
+The variance of this distribution is σ2 = 2b2. We will sometimes write
+Lap(b) to denote the Laplace distribution with scale b, and will some-
+times abuse notation and write Lap(b) simply to denote a random vari-
+able X ∼ Lap(b).
+The Laplace distribution is a symmetric version of the exponential
+distribution.
+We will now define the Laplace Mechanism. As its name suggests,
+the Laplace mechanism will simply compute f , and perturb each coor-
+dinate with noise drawn from the Laplace distribution. The scale of the
+noise will be calibrated to the sensitivity of f (divided by ε).1
+1Alternately, using Gaussian noise with variance calibrated to ∆f ln(1/δ)/ε,
+one can achieve (ε, δ)-differential privacy (see Appendix A). Use of the Laplace
+mechanism is cleaner and the two mechanisms behave similarly under composition
+(Theorem 3.20).
+32 Basic Techniques and Composition Theorems
+Definition 3.3 (The Laplace Mechanism). Given any function f :
+N|X | → Rk, the Laplace mechanism is defined as:
+ML(x, f (·), ε) = f (x) + (Y1, . . . , Yk)
+where Yi are i.i.d. random variables drawn from Lap(∆f /ε).
+Theorem 3.6. The Laplace mechanism preserves (ε, 0)-differential
+privacy.
+Proof. Let x ∈ N|X | and y ∈ N|X | be such that ‖x − y‖1 ≤ 1, and
+let f (·) be some function f : N|X | → Rk. Let px denote the probabil-
+ity density function of ML(x, f, ε) , and let py denote the probability
+density function of ML(y, f, ε). We compare the two at some arbitrary
+point z ∈ Rk
+px(z)
+py(z) =
+k∏
+i=1
+
+ exp(− ε|f (x)i−zi|
+∆f )
+exp(− ε|f (y)i−zi|
+∆f )
+
+
+=
+k∏
+i=1
+exp
+( ε(|f (y)i − zi| − |f (x)i − zi|)
+∆f
+)
+≤
+k∏
+i=1
+exp
+( ε|f (x)i − f (y)i|
+∆f
+)
+= exp
+( ε · ‖f (x) − f (y)‖1
+∆f
+)
+≤ exp(ε),
+where the first inequality follows from the triangle inequality, and
+the last follows from the definition of sensitivity and the fact that
+‖x − y‖1 ≤ 1. That px(z)
+py (z) ≥ exp(−ε) follows by symmetry.
+Example 3.1 (Counting Queries). Counting queries are queries of the
+form “How many elements in the database satisfy Property P ?” We
+will return to these queries again and again, sometimes in this pure
+form, sometimes in fractional form (“What fraction of the elements
+in the databases...?”), sometimes with weights (linear queries), and
+sometimes in slightly more complex forms (e.g., apply h : N|X | → [0, 1]
+to each element in the database and sum the results). Counting is an
+3.3. The laplace mechanism 33
+extremely powerful primitive. It captures everything learnable in the
+statistical queries learning model, as well as many standard datamining
+tasks and basic statistics. Since the sensitivity of a counting query is 1
+(the addition or deletion of a single individual can change a count by
+at most 1), it is an immediate consequence of Theorem 3.6 that (ε, 0)-
+differential privacy can be achieved for counting queries by the addition
+of noise scaled to 1/ε, that is, by adding noise drawn from Lap(1/ε).
+The expected distortion, or error, is 1/ε, independent of the size of the
+database.
+A fixed but arbitrary list of m counting queries can be viewed as
+a vector-valued query. Absent any further information about the set
+of queries a worst-case bound on the sensitivity of this vector-valued
+query is m, as a single individual might change every count. In this
+case (ε, 0)-differential privacy can be achieved by adding noise scaled
+to m/ε to the true answer to each query.
+We sometimes refer to the problem of responding to large numbers
+of (possibly arbitrary) queries as the query release problem.
+Example 3.2 (Histogram Queries). In the special (but common) case in
+which the queries are structurally disjoint we can do much better —
+we don’t necessarily have to let the noise scale with the number of
+queries. An example is the histogram query. In this type of query the
+universe N|X | is partitioned into cells, and the query asks how many
+database elements lie in each of the cells. Because the cells are disjoint,
+the addition or removal of a single database element can affect the
+count in exactly one cell, and the difference to that cell is bounded
+by 1, so histogram queries have sensitivity 1 and can be answered
+by adding independent draws from Lap(1/ε) to the true count in
+each cell.
+To understand the accuracy of the Laplace mechanism for general
+queries we use the following useful fact:
+Fact 3.7. If Y ∼ Lap(b), then:
+Pr[|Y | ≥ t · b] = exp(−t).
+34 Basic Techniques and Composition Theorems
+This fact, together with a union bound, gives us a simple bound on
+the accuracy of the Laplace mechanism:
+Theorem 3.8. Let f : N|X | → Rk, and let y = ML(x, f (·), ε). Then
+∀δ ∈ (0, 1]:
+Pr
+[
+‖f (x) − y‖∞ ≥ ln
+( k
+δ
+)
+·
+( ∆f
+ε
+)]
+≤ δ
+Proof. We have:
+Pr
+[
+‖f (x) − y‖∞ ≥ ln
+( k
+δ
+)
+·
+( ∆f
+ε
+)]
+= Pr
+[
+max
+i∈[k] |Yi| ≥ ln
+( k
+δ
+)
+·
+( ∆f
+ε
+)]
+≤ k · Pr
+[
+|Yi| ≥ ln
+( k
+δ
+)
+·
+( ∆f
+ε
+)]
+= k ·
+( δ
+k
+)
+= δ
+where the second to last inequality follows from the fact that each
+Yi ∼ Lap(∆f /ε) and Fact 3.7.
+Example 3.3 (First Names). Suppose we wish to calculate which first
+names, from a list of 10,000 potential names, were the most common
+among participants of the 2010 census. This question can be repre-
+sented as a query f : N|X | → R10000. This is a histogram query, and so
+has sensitivity ∆f = 1, since every person can only have at most one
+first name. Using the above theorem, we see that we can simultaneously
+calculate the frequency of all 10, 000 names with (1, 0)-differential pri-
+vacy, and with probability 95%, no estimate will be off by more than
+an additive error of ln(10000/.05) ≈ 12.2. That’s pretty low error for a
+nation of more than 300, 000, 000 people!
+Differentially Private Selection. The task in Example 3.3 is one of
+differentially private selection: the space of outcomes is discrete and
+the task is to produce a “best” answer, in this case the most populous
+histogram cell.
+3.3. The laplace mechanism 35
+Example 3.4 (Most Common Medical Condition). Suppose we wish to
+know which condition is (approximately) the most common in the med-
+ical histories of a set of respondents, so the set of questions is, for
+each condition under consideration, whether the individual has ever
+received a diagnosis of this condition. Since individuals can experience
+many conditions, the sensitivity of this set of questions can be high.
+Nonetheless, as we next describe, this task can be addressed using addi-
+tion of Lap(1/ε) noise to each of the counts (note the small scale of the
+noise, which is independent of the total number of conditions). Cru-
+cially, the m noisy counts themselves will not be released (although the
+“winning” count can be released at no extra privacy cost).
+Report Noisy Max. Consider the following simple algorithm to deter-
+mine which of m counting queries has the highest value: Add indepen-
+dently generated Laplace noise Lap(1/ε) to each count and return the
+index of the largest noisy count (we ignore the possibility of a tie). Call
+this algorithm Report Noisy Max.
+Note the “information minimization” principle at work in the
+Report Noisy Max algorithm: rather than releasing all the noisy counts
+and allowing the analyst to find the max and its index, only the
+index corresponding to the maximum is made public. Since the data
+of an individual can affect all counts, the vector of counts has high `1-
+sensitivity, specifically, ∆f = m, and much more noise would be needed
+if we wanted to release all of the counts using the Laplace mechanism.
+Claim 3.9. The Report Noisy Max algorithm is (ε, 0)-differentially
+private.
+Proof. Fix D = D′ ∪ {a}. Let c, respectively c′, denote the vector of
+counts when the database is D, respectively D′. We use two properties:
+1. Monotonicity of Counts. For all j ∈ [m], cj ≥ c′
+j ; and
+2. Lipschitz Property. For all j ∈ [m], 1 + c′
+j ≥ cj .
+Fix any i ∈ [m]. We will bound from above and below the ratio of
+the probabilities that i is selected with D and with D′.
+Fix r−i, a draw from [Lap(1/ε)]m−1 used for all the noisy counts
+except the ith count. We will argue for each r−i independently. We
+36 Basic Techniques and Composition Theorems
+use the notation Pr[i|ξ] to mean the probability that the output of the
+Report Noisy Max algorithm is i, conditioned on ξ.
+We first argue that Pr[i|D, r−i] ≤ eε Pr[i|D′, r−i]. Define
+r∗ = min
+ri
+: ci + ri > cj + rj ∀j 6 = i.
+Note that, having fixed r−i, i will be the output (the argmax noisy
+count) when the database is D if and only if ri ≥ r∗.
+We have, for all 1 ≤ j 6 = i ≤ m:
+ci + r∗ > cj + rj
+⇒ (1 + c′
+i) + r∗ ≥ ci + r∗ > cj + rj ≥ c′
+j + rj
+⇒ c′
+i + (r∗ + 1) > c′
+j + rj .
+Thus, if ri ≥ r∗ + 1, then the ith count will be the maximum when the
+database is D′ and the noise vector is (ri, r−i). The probabilities below
+are over the choice of ri ∼ Lap(1/ε).
+Pr[ri ≥ 1 + r∗] ≥ e−ε Pr[ri ≥ r∗] = e−ε Pr[i|D, r−i]
+⇒ Pr[i|D′, r−i] ≥ Pr[ri ≥ 1 + r∗] ≥ e−ε Pr[ri ≥ r∗] = e−ε Pr[i|D, r−i],
+which, after multiplying through by eε, yields what we wanted to show:
+Pr[i|D, r−i] ≤ eε Pr[i|D′, r−i].
+We now argue that Pr[i|D′, r−i] ≤ eε Pr[i|D, r−i]. Define
+r∗ = min
+ri
+: c′
+i + ri > c′
+j + rj ∀j 6 = i.
+Note that, having fixed r−i, i will be the output (argmax noisy count)
+when the database is D′ if and only if ri ≥ r∗.
+We have, for all 1 ≤ j 6 = i ≤ m:
+c′
+i + r∗ > c′
+j + rj
+⇒ 1 + c′
+i + r∗ > 1 + c′
+j + rj
+⇒ c′
+i + (r∗ + 1) > (1 + c′
+j ) + rj
+⇒ ci + (r∗ + 1) ≥ c′
+i + (r∗ + 1) > (1 + c′
+j ) + rj ≥ cj + rj .
+Thus, if ri ≥ r∗ + 1, then i will be the output (the argmax noisy
+count) on database D with randomness (ri, r−i). We therefore have,
+with probabilities taken over choice of ri:
+Pr[i|D, r−i] ≥ Pr[ri ≥ r∗ + 1] ≥ e−ε Pr[ri ≥ r∗] = e−ε Pr[i|D′, r−i],
+3.4. The exponential mechanism 37
+which, after multiplying through by eε, yields what we wanted to show:
+Pr[i|D′, r−i] ≤ eε Pr[i|D, r−i].
+3.4 The exponential mechanism
+In both the “most common name” and “most common condition” exam-
+ples the “utility” of a response (name or medical condition, respec-
+tively) we estimated counts using Laplace noise and reported the noisy
+maximum. In both examples the utility of the response is directly
+related to the noise values generated; that is, the popularity of the
+name or condition is appropriately measured on the same scale and in
+the same units as the magnitude of the noise.
+The exponential mechanism was designed for situations in which
+we wish to choose the “best” response but adding noise directly to the
+computed quantity can completely destroy its value, such as setting a
+price in an auction, where the goal is to maximize revenue, and adding a
+small amount of positive noise to the optimal price (in order to protect
+the privacy of a bid) could dramatically reduce the resulting revenue.
+Example 3.5 (Pumpkins.). Suppose we have an abundant supply of
+pumpkins and four bidders: A, F, I, K, where A, F, I each bid $1.00
+and K bids $3.01. What is the optimal price? At $3.01 the revenue
+is $3.01, at $3.00 and at $1.00 the revenue is $3.00, but at $3.02 the
+revenue is zero!
+The exponential mechanism is the natural building block for
+answering queries with arbitrary utilities (and arbitrary non-numeric
+range), while preserving differential privacy. Given some arbitrary
+range R, the exponential mechanism is defined with respect to some
+utility function u : N|X | × R → R, which maps database/output pairs
+to utility scores. Intuitively, for a fixed database x, the user prefers that
+the mechanism outputs some element of R with the maximum possible
+utility score. Note that when we talk about the sensitivity of the utility
+score u : N|X | × R → R, we care only about the sensitivity of u with
+respect to its database argument; it can be arbitrarily sensitive in its
+38 Basic Techniques and Composition Theorems
+range argument:
+∆u ≡ max
+r∈R max
+x,y:‖x−y‖1≤1 |u(x, r) − u(y, r)|.
+The intuition behind the exponential mechanism is to output each pos-
+sible r ∈ R with probability proportional to exp(εu(x, r)/∆u) and so
+the privacy loss is approximately:
+ln
+( exp(εu(x, r)/∆u)
+exp(εu(y, r)/∆u)
+)
+= ε[u(x, r) − u(y, r)]/∆u) ≤ ε.
+This intuitive view overlooks some effects of a normalization term which
+arises when an additional person in the database causes the utilities of
+some elements r ∈ R to decrease and others to increase. The actual
+mechanism, defined next, reserves half the privacy budget for changes
+in the normalization term.
+Definition 3.4 (The Exponential Mechanism). The exponential mech-
+anism ME (x, u, R) selects and outputs an element r ∈ R with
+probability proportional to exp( εu(x,r)
+2∆u ).
+The exponential mechanism can define a complex distribution over
+a large arbitrary domain, and so it may not be possible to implement
+the exponential mechanism efficiently when the range of u is super-
+polynomially large in the natural parameters of the problem.
+Returning to the pumpkin example, utility for a price p on database
+x is simply the profit obtained when the price is p and the demand curve
+is as described by x. It is important that the range of potential prices
+is independent of the actual bids. Otherwise there would exist a price
+with non-zero weight in one dataset and zero weight in a neighboring
+set, violating differential privacy.
+Theorem 3.10. The exponential mechanism preserves (ε, 0)-
+differential privacy.
+Proof. For clarity, we assume the range R of the exponential mecha-
+nism is finite, but this is not necessary. As in all differential privacy
+proofs, we consider the ratio of the probability that an instantiation
+3.4. The exponential mechanism 39
+of the exponential mechanism outputs some element r ∈ R on two
+neighboring databases x ∈ N|X | and y ∈ N|X | (i.e., ‖x − y‖1 ≤ 1).
+Pr[ME (x, u, R) = r]
+Pr[ME (y, u, R) = r] =
+(
+exp( εu(x,r)
+2∆u )
+∑
+r′∈R exp( εu(x,r′)
+2∆u )
+)
+(
+exp( εu(y,r)
+2∆u )
+∑
+r′∈R exp( εu(y,r′)
+2∆u )
+)
+=
+( exp( εu(x,r)
+2∆u )
+exp( εu(y,r)
+2∆u )
+)
+·
+
+
+∑
+r′∈R exp( εu(y,r′)
+2∆u )
+∑
+r′∈R exp( εu(x,r′)
+2∆u )
+
+
+= exp
+( ε(u(x, r′) − u(y, r′))
+2∆u
+)
+·
+
+
+∑
+r′∈R exp( εu(y,r′)
+2∆u )
+∑
+r′∈R exp( εu(x,r′)
+2∆u )
+
+
+≤ exp
+( ε
+2
+)
+· exp
+( ε
+2
+)
+·
+
+
+∑
+r′∈R exp( εu(x,r′)
+2∆u )
+∑
+r′∈R exp( εu(x,r′)
+2∆u )
+
+
+= exp(ε).
+Similarly, Pr[ME (y,u)=r]
+Pr[ME (x,u)=r] ≥ exp(−ε) by symmetry.
+The exponential mechanism can often give strong utility guarantees,
+because it discounts outcomes exponentially quickly as their quality
+score falls off. For a given database x and a given utility measure u :
+N|X | × R → R, let OPTu(x) = maxr∈R u(x, r) denote the maximum
+utility score of any element r ∈ R with respect to database x. We will
+bound the probability that the exponential mechanism returns a “good”
+element of R, where good will be measured in terms of OPTu(x). The
+result is that it will be highly unlikely that the returned element r has
+a utility score that is inferior to OPTu(x) by more than an additive
+factor of O((∆u/ε) log |R|).
+Theorem 3.11. Fixing a database x, let ROPT = {r ∈ R : u(x, r) =
+OPTu(x)} denote the set of elements in R which attain utility score
+40 Basic Techniques and Composition Theorems
+OPTu(x). Then:
+Pr
+[
+u(ME (x, u, R)) ≤ OPTu(x) − 2∆u
+ε
+(
+ln
+( |R|
+|ROPT|
+)
++ t
+)]
+≤ e−t
+Proof.
+Pr[u(ME (x, u, R)) ≤ c] ≤ |R| exp(εc/2∆u)
+|ROPT| exp(εOPTu(x)/2∆u)
+= |R|
+|ROPT| exp
+( ε(c − OPTu(x))
+2∆u
+)
+.
+The inequality follows from the observation that each r ∈ R
+with u(x, r) ≤ c has un-normalized probability mass at most
+exp(εc/2∆u), and hence the entire set of such “bad” elements r has
+total un-normalized probability mass at most |R| exp(εc/2∆u). In
+contrast, we know that there exist at least |ROPT| ≥ 1 elements
+with u(x, r) = OPTu(x), and hence un-normalized probability mass
+exp(εOPTu(x)/2∆u), and so this is a lower bound on the normalization
+term.
+The theorem follows from plugging in the appropriate value
+for c.
+Since we always have |ROPT| ≥ 1, we can more commonly make
+use of the following simple corollary:
+Corollary 3.12. Fixing a database x, we have:
+Pr
+[
+u(ME (x, u, R)) ≤ OPTu(x) − 2∆u
+ε (ln (|R|) + t)
+]
+≤ e−t
+As seen in the proofs of Theorem 3.11 and Corollary 3.12, the Expo-
+nential Mechanism can be particularly easy to analyze.
+Example 3.6 (Best of Two). Consider the simple question of determin-
+ing which of exactly two medical conditions A and B is more common.
+Let the two true counts be 0 for condition A and c > 0 for condition B.
+Our notion of utility will be tied to the actual counts, so that conditions
+with bigger counts have higher utility and ∆u = 1. Thus, the utility
+of A is 0 and the utility of B is c. Using the Exponential Mechanism
+3.5. Composition theorems 41
+we can immediately apply Corollary 3.12 to see that the probability of
+observing (wrong) outcome A is at most 2e−c(ε/(2∆u)) = 2e−cε/2.
+Analyzing Report Noisy Max appears to be more complicated, as
+it requires understanding what happens in the (probability 1/4) case
+when the noise added to the count for A is positive and the noise added
+to the count for B is negative.
+A function is monotonic in the data set if the addition of an element
+to the data set cannot cause the value of the function to decrease.
+Counting queries are monotonic; so is the revenue obtained by offering
+a fixed price to a collection of buyers.
+Consider the Report One-Sided Noisy Arg-Max mechanism, which
+adds noise to the utility of each potential output drawn from the one-
+sided exponential distribution with parameter ε/∆u in the case of a
+monotonic utility, or parameter ε/2∆u for the case of a non-monotonic
+utility, and reports the resulting arg-max.
+With this algorithm, whose privacy proof is almost identical to that
+of Report Noisy Max (but loses a factor of two when the utility is
+non-monotonic), we immediately obtain in Example 3.6 above that
+outcome A is exponentially in c(ε/∆u) = cε less likely to be selected
+than outcome B.
+Theorem 3.13. Report One-Sided Noisy Arg-Max, when run with
+parameter ε/2∆u is ε-differentially private.
+Remark 3.1. Report noisy max when instantiated with Laplace noise
+or exponential noise both have similar guarantees to the exponential
+mechanism, but lead to distinct distributions. It turns out that instan-
+tiating report noisy max with the Gumbel distribution leads to an
+algorithm that samples exactly from the exponential mechanism dis-
+tribution. This fact is folklore in machine learning, and known as the
+“Gumbel Max Trick”.
+3.5 Composition theorems
+Now that we have several building blocks for designing differentially
+private algorithms, it is important to understand how we can combine
+42 Basic Techniques and Composition Theorems
+them to design more sophisticated algorithms. In order to use these
+tools, we would like that the combination of two differentially private
+algorithms be differentially private itself. Indeed, as we will see, this is
+the case. Of course the parameters ε and δ will necessarily degrade —
+consider repeatedly computing the same statistic using the Laplace
+mechanism, scaled to give ε-differential privacy each time. The average
+of the answer given by each instance of the mechanism will eventually
+converge to the true value of the statistic, and so we cannot avoid that
+the strength of our privacy guarantee will degrade with repeated use.
+In this section we give theorems showing how exactly the parameters
+ε and δ compose when differentially private subroutines are combined.
+Let us first begin with an easy warm up: we will see that the
+independent use of an (ε1, 0)-differentially private algorithm and an
+(ε2, 0)-differentially private algorithm, when taken together, is (ε1 +
+ε2, 0)-differentially private.
+Theorem 3.14. Let M1 : N|X | → R1 be an ε1-differentially private
+algorithm, and let M2 : N|X | → R2 be an ε2-differentially private
+algorithm. Then their combination, defined to be M1,2 : N|X | → R1 ×
+R2 by the mapping: M1,2(x) = (M1(x), M2(x)) is ε1 +ε2-differentially
+private.
+Proof. Let x, y ∈ N|X | be such that ‖x − y‖1 ≤ 1. Fix any (r1, r2) ∈
+R1 × R2. Then:
+Pr[M1,2(x) = (r1, r2)]
+Pr[M1,2(y) = (r1, r2)] = Pr[M1(x) = r1] Pr[M2(x) = r2]
+Pr[M1(y) = r1] Pr[M2(y) = r2]
+=
+( Pr[M1(x) = r1]
+Pr[M1(y) = r1]
+) ( Pr[M2(x) = r1]
+Pr[M2(y) = r1]
+)
+≤ exp(ε1) exp(ε2)
+= exp(ε1 + ε2)
+By symmetry, Pr[M1,2(x)=(r1,r2)]
+Pr[M1,2(y)=(r1,r2)] ≥ exp(−(ε1 + ε2)).
+The composition theorem can be applied repeatedly to obtain the
+following corollary:
+3.5. Composition theorems 43
+Corollary 3.15. Let Mi : N|X | → Ri be an (εi, 0)-differentially private
+algorithm for i ∈ [k]. Then if M[k] : N|X | → ∏k
+i=1 Ri is defined to be
+M[k](x) = (M1(x), . . . , Mk(x)), then M[k] is (∑k
+i=1 εi, 0)-differentially
+private.
+A proof of the generalization of this theorem to (ε, δ)-differential
+privacy appears in Appendix B:
+Theorem 3.16. Let Mi : N|X | → Ri be an (εi, δi)-differentially private
+algorithm for i ∈ [k]. Then if M[k] : N|X | → ∏k
+i=1 Ri is defined to
+be M[k](x) = (M1(x), . . . , Mk(x)), then M[k] is (∑k
+i=1 εi, ∑k
+i=1 δi)-
+differentially private.
+It is a strength of differential privacy that composition is
+“automatic,” in that the bounds obtained hold without any special
+effort by the database curator.
+3.5.1 Composition: some technicalities
+In the remainder of this section, we will prove a more sophisticated
+composition theorem. To this end, we will need some definitions and
+lemmas, rephrasing differential privacy in terms of distance measures
+between distributions. In the fractional quantities below, if the denom-
+inator is zero, then we define the value of the fraction to be infinite
+(the numerators will always be positive).
+Definition 3.5 (KL-Divergence). The KL-Divergence, or Relative
+Entropy, between two random variables Y and Z taking values from
+the same domain is defined to be:
+D(Y ‖Z) = Ey∼Y
+[
+ln Pr[Y = y]
+Pr[Z = y]
+]
+.
+It is known that D(Y ‖Z) ≥ 0, with equality if and only if Y and
+Z are identically distributed. However, D is not symmetric, does not
+satisfy the triangle inequality, and can even be infinite, specifically when
+Supp(Y ) is not contained in Supp(Z).
+Definition 3.6 (Max Divergence). The Max Divergence between two
+random variables Y and Z taking values from the same domain is
+44 Basic Techniques and Composition Theorems
+defined to be:
+D∞(Y ‖Z) = max
+S⊆Supp(Y )
+[
+ln Pr[Y ∈ S]
+Pr[Z ∈ S]
+]
+.
+The δ-Approximate Max Divergence between Y and Z is defined to be:
+Dδ
+∞(Y ‖Z) = max
+S⊆Supp(Y ):Pr[Y ∈S]≥δ
+[
+ln Pr[Y ∈ S] − δ
+Pr[Z ∈ S]
+]
+Remark 3.2. Note that a mechanism M is
+1. ε-differentially private if and only if on every two neigh-
+boring databases x and y, D∞(M(x)‖M(y)) ≤ ε and
+D∞(M(y)‖M(x)) ≤ ε; and is
+2. (ε, δ)-differentially private if and only if on every two neigh-
+boring databases x, y: Dδ
+∞(M(x)‖M(y)) ≤ ε and Dδ
+∞(M(y)‖
+M(x)) ≤ ε.
+One other distance measure that will be useful is the statistical
+distance between two random variables Y and Z, defined as
+∆(Y, Z) def
+= max
+S | Pr[Y ∈ S] − Pr[Z ∈ S]|.
+We say that Y and Z are δ-close if ∆(Y, Z) ≤ δ.
+We will use the following reformulations of approximate max-
+divergence in terms of exact max-divergence and statistical distance:
+Lemma 3.17.
+1. Dδ
+∞(Y ‖Z) ≤ ε if and only if there exists a random variable Y ′
+such that ∆(Y, Y ′) ≤ δ and D∞(Y ′‖Z) ≤ ε.
+2. We have both Dδ
+∞(Y ‖Z) ≤ ε and Dδ
+∞(Z‖Y ) ≤ ε if and only if
+there exist random variables Y ′, Z′ such that ∆(Y, Y ′) ≤ δ/(eε +
+1), ∆(Z, Z′) ≤ δ/(eε + 1), and D∞(Y ′‖Z′) ≤ ε.
+Proof. For Part 1, suppose there exists Y ′ δ-close to Y such that
+D∞(Y ‖Z) ≤ ε. Then for every S,
+Pr[Y ∈ S] ≤ Pr[Y ′ ∈ S] + δ ≤ eε · Pr[Z ∈ S] + δ,
+and thus Dδ
+∞(Y ‖Z) ≤ ε.
+3.5. Composition theorems 45
+Conversely, suppose that Dδ
+∞(Y ‖Z) ≤ ε. Let S = {y : Pr[Y = y] >
+eε · Pr[Z = y]}. Then
+∑
+y∈S
+(Pr[Y = y] − eε · Pr[Z = y]) = Pr[Y ∈ S] − eε · Pr[Z ∈ S] ≤ δ.
+Moreover, if we let T = {y : Pr[Y = y] < Pr[Z = y]}, then we have
+∑
+y∈T
+(Pr[Z = y] − Pr[Y = y]) = ∑
+y /∈T
+(Pr[Y = y] − Pr[Z = y])
+≥ ∑
+y∈S
+(Pr[Y = y] − Pr[Z = y])
+≥ ∑
+y∈S
+(Pr[Y = y] − eε · Pr[Z = y])/
+Thus, we can obtain Y ′ from Y by lowering the probabilities on S and
+raising the probabilities on T to satisfy:
+1. For all y ∈ S, Pr[Y ′ = y] = eε · Pr[Z = y] < Pr[Y = y].
+2. For all y ∈ T , Pr[Y = y] ≤ Pr[Y ′ = y] ≤ Pr[Z = y].
+3. For all y /∈ S ∪ T , Pr[Y ′ = y] = Pr[Y = y] ≤ eε · Pr[Z = y].
+Then D∞(Y ′‖Z) ≤ ε by inspection, and
+∆(Y, Y ′) = Pr[Y ∈ S] − Pr[Y ′ ∈ S] = Pr[Y ∈ S] − eε · Pr[Z ∈ S] ≤ δ.
+We now prove Part 2. Suppose there exist random variables Y ′
+and Z′ as stated. Then, for every set S,
+Pr[Y ∈ S] ≤ Pr[Y ′ ∈ S] + δ
+eε + 1
+≤ eε · Pr[Z′ ∈ S] + δ
+eε + 1
+≤ eε ·
+(
+Pr[Z ∈ S] + δ
+eε + 1
+)
++ δ
+eε + 1
+= eε · Pr[Z ∈ S] + δ.
+Thus Dδ
+∞(Y ‖Z) ≤ ε, and by symmetry, Dδ
+∞(Z‖Y ) ≤ ε.
+Conversely, given Y and Z such that Dδ
+∞(Y ‖Z) ≤ ε and
+Dδ
+∞(Z‖Y ) ≤ ε, we proceed similarly to Part 1. However, instead of
+simply decreasing the probability mass of Y on S to obtain Y ′ and
+46 Basic Techniques and Composition Theorems
+eliminate the gap with eε · Z, we also increase the probability mass of
+Z on S. Specifically, for every y ∈ S, we’ll take
+Pr[Y ′ = y] = eε · Pr[Z′ = y]
+= eε
+1 + eε · (Pr[Y = y] + Pr[Z = y])
+∈ [eε · Pr[Z = y], Pr[Y = y]].
+This also implies that for y ∈ S, we have:
+Pr[Y = y] − Pr[Y ′ = y]
+= Pr[Z′ = y] − Pr[Z = y] Pr[Y = y] − eε · Pr[Z = y]
+eε + 1 ,
+and thus
+α def
+= ∑
+y∈S
+(Pr[Y = y] − Pr[Y ′ = y])
+= ∑
+y∈S
+(Pr[Z′ = y] − Pr[Z = y])
+= Pr[Y ∈ S] − eε · Pr[Z ∈ S]
+eε + 1
+≤ δ
+eε + 1 .
+Similarly on the set S′ = {y : Pr[Z = y] > eε · Pr[Y = y]}, we can
+decrease the probability mass of Z and increase the probability mass
+of Y by a total of some α′ ≤ δ/(eε + 1) so that for every y ∈ S′, we
+have Pr[Z′ = y] = eε · Pr[Y ′ = y].
+If α = α′, then we can take Pr[Z′ = y] = Pr[Z = y] and
+Pr[Y ′ = y] = Pr[Y = y] for all y /∈ S ∪ S′, giving D∞(Y ‖Z) ≤ ε
+and ∆(Y, Y ′) = ∆(Z, Z′) = α. If α 6 = α′, say α > α′, then we need to
+still increase the probability mass of Y ′ and decrease the mass of Z′
+by a total of β = α − α′ on points outside of S ∪ S′ in order to ensure
+that the probabilities sum to 1. That is, if we try to take the “mass
+functions” Pr[Y ′ = y] and Pr[Z′ = y] as defined above, then while we
+do have the property that for every y, Pr[Y ′ = y] ≤ eε · Pr[Z′ = y]
+and Pr[Z′ = y] ≤ eε · Pr[Y ′ = y] we also have ∑
+y Pr[Y ′ = y] = 1 − β
+3.5. Composition theorems 47
+and ∑
+y Pr[Z′ = y] = 1 + β. However, this means that if we let
+R = {y : Pr[Y ′ = y] < Pr[Z′ = y]}, then
+∑
+y∈R
+(Pr[Z′ = y] − Pr[Y ′ = y]) ≥ ∑
+y
+(Pr[Z′ = y] − Pr[Y ′ = y]) = 2β.
+So we can increase the probability mass of Y ′ on points in R by a total of
+β and decrease the probability mass of Z′ on points in R by a total of β,
+while retaining the property that for all y ∈ R, Pr[Y ′ = y] ≤ Pr[Z′ = y].
+The resulting Y ′ and Z′ have the properties we want: D∞(Y ′, Z′) ≤ ε
+and ∆(Y, Y ′), ∆(Z, Z′) ≤ α.
+Lemma 3.18. Suppose that random variables Y and Z satisfy
+D∞(Y ‖Z) ≤ ε and D∞(Z‖Y ) ≤ ε. Then D(Y ‖Z) ≤ ε · (eε − 1).
+Proof. We know that for any Y and Z it is the case that D(Y ‖Z) ≥ 0
+(via the “log-sum inequality”), and so it suffices to bound D(Y ‖Z) +
+D(Z‖Y ). We get:
+D(Y ‖Z) ≤ D(Y ‖Z) + D(Z‖Y )
+= ∑
+y
+Pr[Y = y] ·
+(
+ln Pr[Y = y]
+Pr[Z = y] + ln Pr[Z = y]
+Pr[Y = y]
+)
++ (Pr[Z = y] − Pr[Y = y]) ·
+(
+ln Pr[Z = y]
+Pr[Y = y]
+)
+≤ ∑
+y
+[0 + |Pr[Z = y] − Pr[Y = y]| · ε]
+= ε · ∑
+y
+[max{Pr[Y = y], Pr[Z = y]}
+− min{Pr[Y = y], Pr[Z = y]}]
+≤ ε · ∑
+y
+[(eε − 1) · min{Pr[Y = y], Pr[Z = y]}]
+≤ ε · (eε − 1).
+Lemma 3.19 (Azuma’s Inequality). Let C1, . . . , Ck be real-valued ran-
+dom variables such that for every i ∈ [k], Pr[|Ci| ≤ α] = 1, and for
+48 Basic Techniques and Composition Theorems
+every (c1, . . . , ci−1) ∈ Supp(C1, . . . , Ci−1), we have
+E[Ci|C1 = c1, . . . , Ci−1 = ci−1] ≤ β.
+Then for every z > 0, we have
+Pr
+[ k∑
+i=1
+Ci > kβ + z√k · α
+]
+≤ e−z2/2.
+3.5.2 Advanced composition
+In addition to allowing the parameters to degrade more slowly, we
+would like our theorem to be able to handle more complicated forms of
+composition. However, before we begin, we must discuss what exactly
+we mean by composition. We would like our definitions to cover the
+following two interesting scenarios:
+1. Repeated use of differentially private algorithms on the same
+database. This allows both the repeated use of the same
+mechanism multiple times, as well as the modular construction of
+differentially private algorithms from arbitrary private building
+blocks.
+2. Repeated use of differentially private algorithms on different
+databases that may nevertheless contain information relating to
+the same individual. This allows us to reason about the cumu-
+lative privacy loss of a single individual whose data might be
+spread across multiple data sets, each of which may be used inde-
+pendently in a differentially private way. Since new databases are
+created all the time, and the adversary may actually influence the
+makeup of these new databases, this is a fundamentally different
+problem than repeatedly querying a single, fixed, database.
+We want to model composition where the adversary can adaptively
+affect the databases being input to future mechanisms, as well as the
+queries to those mechanisms. Let F be a family of database access
+mechanisms. (For example F could be the set of all ε-differentially
+private mechanisms.) For a probabilistic adversary A, we consider two
+experiments, Experiment 0 and Experiment 1, defined as follows.
+3.5. Composition theorems 49
+Experiment b for family F and adversary A:
+For i = 1, . . . , k:
+1. A outputs two adjacent databases x0
+i and x1
+i , a mechanism
+Mi ∈ F, and parameters wi.
+2. A receives yi ∈R Mi(wi, xi,b).
+We allow the adversary A above to be stateful throughout the exper-
+iment, and thus it may choose the databases, mechanisms, and the
+parameters adaptively depending on the outputs of previous mecha-
+nisms. We define A’s view of the experiment to be A’s coin tosses and
+all of the mechanism outputs (y1, . . . , yk). (The xj
+i ’s, Mi’s, and wi’s
+can all be reconstructed from these.)
+For intuition, consider an adversary who always chooses x0
+i to hold
+Bob’s data and x1
+i to differ only in that Bob’s data are deleted. Then
+experiment 0 can be thought of as the “real world,” where Bob allows
+his data to be used in many data releases, and Experiment 1 as an
+“ideal world,” where the outcomes of these data releases do not depend
+on Bob’s data. Our definitions of privacy still require these two exper-
+iments to be “close” to each other, in the same way as required by
+the definitions of differential privacy. The intuitive guarantee to Bob is
+that the adversary “can’t tell”, given the output of all k mechanisms,
+whether Bob’s data was ever used.
+Definition 3.7. We say that the family F of database access mecha-
+nisms satisfies ε-differential privacy under k-fold adaptive composition
+if for every adversary A, we have D∞(V 0‖V 1) ≤ ε where V b denotes
+the view of A in k-fold Composition Experiment b above.
+(ε, δ)-differential privacy under k-fold adaptive composition instead
+requires that Dδ
+∞(V 0‖V 1) ≤ ε.
+Theorem 3.20 (Advanced Composition). For all ε, δ, δ′ ≥ 0, the class of
+(ε, δ)-differentially private mechanisms satisfies (ε′, kδ + δ′)-differential
+privacy under k-fold adaptive composition for:
+ε′ =
+√
+2k ln(1/δ′)ε + kε(eε − 1).
+50 Basic Techniques and Composition Theorems
+Proof. A view of the adversary A consists of a tuple of the form v =
+(r, y1, . . . , yk), where r is the coin tosses of A and y1, . . . , yk are the
+outputs of the mechanisms M1, . . . , Mk. Let
+B = {v : Pr[V 0 = v] > eε′
+· Pr[V 1 = v]}.
+We will show that Pr[V 0 ∈ B] ≤ δ, and hence for every set S, we have
+Pr[V 0 ∈ S] ≤ Pr[V 0 ∈ B] + Pr[V 0 ∈ (S \ B)] ≤ δ + eε′
+· Pr[V 1 ∈ S].
+This is equivalent to saying that Dδ
+∞(V 0‖V 1) ≤ ε′.
+It remains to show Pr[V 0 ∈ B] ≤ δ. Let random variable V 0 =
+(R0, Y 0
+1 , . . . , Y 0
+k ) denote the view of A in Experiment 0 and V 1 =
+(R1, Y 1
+1 , . . . , Y 1
+k ) the view of A in Experiment 1. Then for a fixed view
+v = (r, y1, . . . , yk), we have
+ln
+( Pr[V 0 = v]
+Pr[V 1 = v]
+)
+= ln
+( Pr[R0 = r]
+Pr[R1 = r] ·
+k∏
+i=1
+Pr[Y 0
+i = yi|R0 = r, Y 0
+1 = y1, . . . , Y 0
+i−1 = yi−1]
+Pr[Y 1
+i = yi|R1 = r, Y 1
+1 = y1, . . . , Y 1
+i−1 = yi−1]
+)
+=
+k∑
+i=1
+ln
+( Pr[Y 0
+i = yi|R0 = r, Y 0
+1 = y1, . . . , Y 0
+i−1 = yi−1]
+Pr[Y 1
+i = yi|R1 = r, Y 1
+1 = y1, . . . , Y 1
+i−1 = yi−1]
+)
+def
+=
+k∑
+i=1
+ci(r, y1, . . . , yi).
+Now for every prefix (r, y1, . . . , yi−1) we condition on R0 = r, Y 0
+1 =
+y1, . . . , Y 0
+i−1 = yi−1, and analyze the expectation and maximum
+possible value of the random variable ci(R0, Y 0
+1 , . . . , Y 0
+i ) = ci(r, y1, . . .,
+yi−1, Y 0
+i ). Once the prefix is fixed, the next pair of databases x0
+i and
+x1
+i , the mechanism Mi, and parameter wi output by A are also deter-
+mined (in both Experiment 0 and 1). Thus Y 0
+i is distributed according
+to Mi(wi, x0
+i ). Moreover for any value yi, we have
+ci(r, y1, . . . , yi−1, yi) = ln
+( Pr[Mi(wi, x0
+i ) = yi]
+Pr[Mi(wi, x1
+i ) = yi]
+)
+.
+3.5. Composition theorems 51
+By ε-differential privacy this is bounded by ε. We can also reason as
+follows:
+|ci(r, y1, . . . , yi−1, yi)|
+≤ max{D∞(Mi(wi, x0
+i )‖Mi(wi, x1
+i )),
+D∞(Mi(wi, x1
+i )‖Mi(wi, x0
+i ))}
+= ε.
+By Lemma 3.18, we have:
+E[ci(R0, Y 0
+1 , . . . , Y 0
+i )|R0 = r, Y 0
+1 = y1, . . . , Y 0
+i−1 = yi−1]
+= D(Mi(wi, x0
+i )‖Mi(wi, x1
+i ))
+≤ ε(eε − 1).
+Thus we can apply Azuma’s Inequality to the random variables Ci =
+ci(R0, Y 0
+1 , . . . , Y 0
+i ) with α = ε, β = ε·ε0, and z = √2 ln(1/δ), to deduce
+that
+Pr[V 0 ∈ B] = Pr
+[∑
+i
+Ci > ε′
+]
+< e−z2/2 = δ,
+as desired.
+To extend the proof to composition of (ε, δ)-differentially private
+mechanisms, for δ > 0, we use the characterization of approximate max-
+divergence from Lemma 3.17 (Part 2) to reduce the analysis to the same
+situation as in the case of (ε, 0)-indistinguishable sequences. Specifi-
+cally, using Lemma 3.17, Part 2 for each of the differentially private
+mechanisms selected by the adversary A and the triangle inequality
+for statistical distance, it follows that that V 0 is kδ-close to a random
+variable W = (R, Z1, . . . , Zk) such that for every prefix r, y1, . . . , yi−1,
+if we condition on R = R1 = r, Z1 = Y 1
+1 = y1, . . . , Zi−1 = Y 1
+i−1 = yi−1,
+then it holds that D∞(Zi‖Y 1
+i ) ≤ ε and D∞(Y 1
+i ‖Zi) ≤ ε.
+This suffices to show that Dδ′
+∞(W ‖V 1) ≤ ε′. Since V 0 is kδ-close to
+W , Lemma 3.17, Part 1 gives Dδ′+kδ(V 0‖W ) ≤ ε′.
+An immediate and useful corollary tells us a safe choice of ε for each
+of k mechanisms if we wish to ensure (ε′, kδ + δ′)-differential privacy
+for a given ε′, δ′.
+54 Basic Techniques and Composition Theorems
+then we will exactly select for the events with large Gaussian noise —
+noise that occurs with probability less than δ. When we are this far
+out on the tail of the Gaussian we no longer have a guarantee that the
+observation is within an e±ε factor as likely to occur on x as on y.
+3.5.4 Remarks on composition
+The ability to analyze cumulative privacy loss under composition gives
+us a handle on what a world of diﬀerentially private databases can oﬀer.
+A few observations are in order.
+Weak Quantiﬁcation. Assume that the adversary always chooses x0
+i
+to hold Bob’s data, and x1
+i to be the same database but with Bob’s data
+deleted. Theorem 3.20, with appropriate choise of parameters, tells us
+that an adversary — including one that knows or even selects(!) the
+database pairs — has little advantage in determining the value of b ∈
+{0, 1}. This is an inherently weak quantiﬁcation. We can ensure that the
+adversary is unlikely to distinguish reality from any given alternative,
+but we cannot ensure this simultaneously for all alternatives. If there
+are one zillion databases but Bob is a member of only 10,000 of these,
+then we are not simultaneously protecting Bob’s absence from all zillion
+minus ten thousand. This is analogous to the quantiﬁcation in the
+deﬁnition of (ε, δ)-diﬀerential privacy, where we ﬁx in advance a pair
+of adjacent databases and argue that with high probability the output
+will be almost equally likely with these two databases.
+Humans and Ghosts. Intuitively, an (ε, 0)-diﬀerentially private
+database with a small number of bits per record is less protective than
+a diﬀerentially private database with the same choice of ε that con-
+tains our entire medical histories. So in what sense is our principle
+privacy measure, ε, telling us the same thing about databases that dif-
+fer radically in the complexity and sensitivity of the data they store?
+The answer lies in the composition theorems. Imagine a world inhab-
+ited by two types of beings: ghosts and humans. Both types of beings
+behave the same, interact with others in the same way, write, study,
+work, laugh, love, cry, reproduce, become ill, recover, and age in the
+same fashion. The only diﬀerence is that ghosts have no records in
+3.6. The sparse vector technique 55
+databases, while humans do. The goal of the privacy adversary is to
+determine whether a given 50-year old, the “target,” is a ghost or a
+human. Indeed, the adversary is given all 50 years to do so. The adver-
+sary does not need to remain passive, for example, she can organize
+clinical trials and enroll patients of her choice, she can create humans
+to populate databases, eﬀectively creating the worst-case (for privacy)
+databases, she can expose the target to chemicals at age 25 and again
+at 35, and so on. She can know everything about the target that could
+possibly be entered into any database. She can know which databases
+the target would be in, were the target human. The composition theo-
+rems tell us that the privacy guarantees of each database — regardless
+of the data type, complexity, and sensitivity — give comparable pro-
+tection for the human/ghost bit.
+3.6 The sparse vector technique
+The Laplace mechanism can be used to answer adaptively chosen low
+sensitivity queries, and we know from our composition theorems that
+the privacy parameter degrades proportionally to the number of queries
+answered (or its square root). Unfortunately, it will often happen that
+we have a very large number of questions to answer — too many to yield
+a reasonable privacy guarantee using independent perturbation tech-
+niques, even with the advanced composition theorems of Section 3.5.
+In some situations however, we will only care to know the identity of
+the queries that lie above a certain threshold. In this case, we can hope
+to gain over the naïve analysis by discarding the numeric answer to
+queries that lie signiﬁcantly below the threshold, and merely report-
+ing that they do indeed lie below the threshold. (We will be able to
+get the numeric values of the above-threshold queries as well, at lit-
+tle additional cost, if we so choose). This is similar to what we did in
+the Report Noisy Max mechanism in section 3.3, and indeed iterating
+either that algorithm or the exponential mechanism would be an option
+for the non-interactive, or oﬄine, case.
+In this section, we show how to analyze a method for this in the
+online setting. The technique is simple — add noise and report only
+56 Basic Techniques and Composition Theorems
+whether the noisy value exceeds the threshold — and our emphasis is
+on the analysis, showing that privacy degrades only with the number
+of queries which actually lie above the threshold, rather than with the
+total number of queries. This can be a huge savings if we know that
+the set of queries that lie above the threshold is much smaller than the
+total number of queries — that is, if the answer vector is sparse.
+In a little more detail, we will consider a sequence of events — one
+for each query — which occur if a query evaluated on the database
+exceeds a given (known, public) threshold. Our goal will be to release a
+bit vector indicating, for each event, whether or not it has occurred. As
+each query is presented, the mechanism will compute a noisy response,
+compare it to the (publicly known) threshold, and, if the threshold is
+exceeded, reveal this fact. For technical reasons in the proof of privacy
+(Theorem 3.24), the algorithm works with a noisy version ˆT of the
+threshold T . While T is public the noisy version ˆT is not.
+Rather than incurring a privacy loss for each possible query, the
+analysis below will result in a privacy cost only for the query values
+that are near or above the threshold.
+The Setting. Let m denote the total number of sensitivity 1 queries,
+which may be chosen adaptively. Without loss of generality, there is
+a single threshold T ﬁxed in advance (alternatively, each query can
+have its own threshold, but the results are unchanged). We will be
+adding noise to query values and comparing the results to T . A positive
+outcome means that a noisy query value exceeds the threshold. We
+expect a small number c of noisy values to exceed the threshold, and we
+are releasing only the noisy values above the threshold. The algorithm
+will use c in its stopping condition.
+We will ﬁrst analyze the case in which the algorithm halts after c =
+1 above-threshold query, and show that this algorithm is ε-diﬀerentially
+private no matter how long the total sequence of queries is. We will then
+analyze the case of c > 1 by using our composition theorems, and derive
+bounds both for (ε, 0) and (ε, δ)-diﬀerential privacy.
+We ﬁrst argue that AboveThreshold, the algorithm specialized to
+the case of only one above-threshold query, is private and accurate.
+3.6. The sparse vector technique 57
+Algorithm 1 Input is a private database D, an adaptively chosen
+stream of sensitivity 1 queries f1, . . ., and a threshold T . Output is a
+stream of responses a1, . . .
+AboveThreshold(D, {fi}, T, ε)
+Let ˆT = T + Lap
+( 2
+ε
+)
+.
+for Each query i do
+Let νi = Lap( 4
+ε )
+if fi(D) + νi ≥ ˆT then
+Output ai = >.
+Halt.
+else
+Output ai = ⊥.
+end if
+end for
+Theorem 3.23. AboveThreshold is (ε, 0)-diﬀerentially private.
+Proof. Fix any two neighboring databases D and D′. Let A denote
+the random variable representing the output of AboveThresh-
+old(D, {fi}, T, ε) and let A′ denote the random variable representing
+the output of AboveThreshold(D′, {fi}, T, ε). The output of the algo-
+rithm is some realization of these random variables, a ∈ {>, ⊥}k and
+has the form that for all i < k, ai = ⊥ and ak = >. There are two
+types of random variables internal to the algorithm: the noisy thresh-
+old ˆT and the perturbations to each of the k queries, {νi}k
+i=1. For the
+following analysis, we will ﬁx the (arbitrary) values of ν1, . . . , νk−1 and
+take probabilities over the randomness of νk and ˆT . Deﬁne the fol-
+lowing quantity representing the maximum noisy value of any query
+f1, . . . , fk−1 evaluated on D:
+g(D) = max
+i<k (fi(D) + νi)
+In the following, we will abuse notation and write Pr[ ˆT = t] as short-
+hand for the pdf of ˆT evaluated at t (similarly for νk), and write 1[x]
+to denote the indicator function of event x. Note that ﬁxing the values
+58 Basic Techniques and Composition Theorems
+of ν1, . . . , νk−1 (which makes g(D) a deterministic quantity), we have:
+Pr
+ˆT ,νk
+[A = a] = Pr
+ˆT ,νk
+[ ˆT > g(D) and fk(D) + νk ≥ ˆT ]
+= Pr
+ˆT ,νk
+[ ˆT ∈ (g(D), fk(D) + νk]]
+=
+∫ ∞
+−∞
+∫ ∞
+−∞
+Pr[νk = v]
+· Pr[ ˆT = t]1[t ∈ (g(D), fk(D) + v]]dvdt
+.
+= ∗
+We now make a change of variables. Deﬁne:
+ˆv = v + g(D) − g(D′) + fk(D′) − fk(D)
+ˆt = t + g(D) − g(D′)
+and note that for any D, D′, |ˆv − v| ≤ 2 and |ˆt − t| ≤ 1. This follows
+because each query fi(D) is 1-sensitive, and hence the quantity g(D)
+is 1-sensitive as well. Applying this change of variables, we have:
+∗ =
+∫ ∞
+−∞
+∫ ∞
+−∞
+Pr[νk = ˆv] · Pr[ ˆT = ˆt]1[(t + g(D) − g(D′))
+∈ (g(D), fk(D′) + v + g(D) − g(D′)]]dvdt
+=
+∫ ∞
+−∞
+∫ ∞
+−∞
+Pr[νk = ˆv] · Pr[ ˆT = ˆt]1[(t ∈ (g(D′), fk(D′) + v]]dvdt
+≤
+∫ ∞
+−∞
+∫ ∞
+−∞
+exp(ε/2) Pr[νk = v]
+· exp(ε/2) Pr[ ˆT = t]1[(t ∈ (g(D′), fk(D′) + v]]dvdt
+= exp(ε) Pr
+ˆT ,νk
+[ ˆT > g(D′) and fk(D′) + νk ≥ ˆT ]
+= exp(ε) Pr
+ˆT ,νk
+[A′ = a]
+where the inequality comes from our bounds on |ˆv − v| and |ˆt − t| and
+the form of the pdf of the Laplace distribution.
+Deﬁnition 3.9 (Accuracy). We will say that an algorithm which outputs
+a stream of answers a1, . . . , ∈ {>, ⊥}∗ in response to a stream of k
+3.6. The sparse vector technique 59
+queries f1, . . . , fk is (α, β)-accurate with respect to a threshold T if
+except with probability at most β, the algorithm does not halt before
+fk, and for all ai = >:
+fi(D) ≥ T − α
+and for all ai = ⊥:
+fi(D) ≤ T + α.
+What can go wrong in Algorithm 1? The noisy threshold ˆT can be
+very far from T , say, | ˆT − T | > α. In addition a small count fi(D) <
+T − α can have so much noise added to it that it is reported as above
+threshold (even when the threshold is close to correct), and a large
+count fi(D) > T + α can be reported as below threshold. All of these
+happen with probability exponentially small in α. In summary, we can
+have a problem with the choice of the noisy threshold or we can have a
+problem with one or more of the individual noise values νi. Of course,
+we could have both kinds of errors, so in the analysis below we allocate
+α/2 to each type.
+Theorem 3.24. For any sequence of k queries f1, . . . , fk such that
+|{i < k : fi(D) ≥ T − α}| = 0 (i.e. the only query close to being
+above threshold is possibly the last one), AboveThreshold(D, {fi}, T, ε)
+is (α, β) accurate for:
+α = 8(log k + log(2/β))
+ε .
+Proof. Observe that the theorem will be proved if we can show that
+except with probability at most β:
+max
+i∈[k] |νi| + |T − ˆT | ≤ α
+If this is the case, then for any ai = >, we have:
+fi(D) + νi ≥ ˆT ≥ T − |T − ˆT |
+or in other words:
+fi(D) ≥ T − |T − ˆT | − |νi| ≥ T − α
+60 Basic Techniques and Composition Theorems
+Similarly, for any ai = ⊥ we have:
+fi(D) < ˆT ≤ T + |T − ˆT | + |νi| ≤ T + α
+We will also have that for any i < k: fi(D) < T − α < T − |νi| − |T − ˆT |,
+and so: fi(D) + νi ≤ ˆT , meaning ai = ⊥. Therefore the algorithm does
+not halt before k queries are answered.
+We now complete the proof.
+Recall that if Y ∼ Lap(b), then: Pr[|Y | ≥ t·b] = exp(−t). Therefore
+we have:
+Pr[|T − ˆT | ≥ α
+2 ] = exp
+(
+− εα
+4
+)
+Setting this quantity to be at most β/2, we ﬁnd that we require α ≥
+4 log(2/β)
+ε
+Similarly, by a union bound, we have:
+Pr[max
+i∈[k] |νi| ≥ α/2] ≤ k · exp
+(
+− εα
+8
+)
+Setting this quantity to be at most β/2, we ﬁnd that we require α ≥
+8(log(2/β)+log k)
+ε These two claims combine to prove the theorem.
+We now show how to handle multiple “above threshold” queries
+using composition.
+The Sparse algorithm can be thought of as follows: As queries come
+in, it makes repeated calls to AboveThreshold. Each time an above
+threshold query is reported, the algorithm simply restarts the remain-
+ing stream of queries on a new instantiation of AboveThreshold. It
+halts after it has restarted AboveThreshold c times (i.e. after c above
+threshold queries have appeared). Each instantiation of AboveThresh-
+old is (ε, 0)-private, and so the composition theorems apply.
+Theorem 3.25. Sparse is (ε, δ)-diﬀerentially private.
+Proof. We observe that Sparse is exactly equivalent to the following
+procedure: We run AboveThreshold(D, {fi}, T, ε′) on our stream of
+queries {fi} setting
+ε′ =
+
+
+
+ε
+c , If δ = 0;
+ε√8c ln 1
+δ
+, Otherwise.
+3.6. The sparse vector technique 61
+Algorithm 2 Input is a private database D, an adaptively chosen
+stream of sensitivity 1 queries f1, . . ., a threshold T , and a cutoﬀ point
+c. Output is a stream of answers a1, . . .
+Sparse(D, {fi}, T, c, ε, δ)
+If δ = 0 Let σ = 2c
+ε . Else Let σ =
+√32c ln 1
+δ
+ε
+Let ˆT0 = T + Lap(σ)
+Let count = 0
+for Each query i do
+Let νi = Lap(2σ)
+if fi(D) + νi ≥ ˆTcount then
+Output ai = >.
+Let count = count +1.
+Let ˆTcount = T + Lap(σ)
+else
+Output ai = ⊥.
+end if
+if count ≥ c then
+Halt.
+end if
+end for
+using the answers supplied by AboveThreshold. When AboveThresh-
+old halts (after 1 above threshold query), we simply restart
+Sparse(D, {fi}, T, ε′) on the remaining stream, and continue in this
+manner until we have restarted AboveThreshold c times. After the
+c’th restart of AboveThreshold halts, we halt as well. We have already
+proven that AboveThreshold(D, {fi}, T, ε′) is (ε′, 0) diﬀerentially pri-
+vate. Finally, by the advanced composition theorem (Theorem 3.20), c
+applications of an ε′ = ε√8c ln 1
+δ
+-diﬀerentially private algorithm is (ε, δ)-
+diﬀerentially private, and c applications of an ε′ = ε/c diﬀerentially
+private algorithm is (ε, 0)-private as desired.
+It remains to prove accuracy for Sparse, by again observing that
+Sparse consists only of c calls to AboveThreshold. We note that if each
+62 Basic Techniques and Composition Theorems
+of these calls to AboveThreshold is (α, β/c)-accurate, then Sparse will
+be (α, β)-accurate.
+Theorem 3.26. For any sequence of k queries f1, . . . , fk such that
+L(T ) ≡ |{i : fi(D) ≥ T − α}| ≤ c, if δ > 0, Sparse is (α, β) accu-
+rate for:
+α = (ln k + ln 2c
+β )
+√
+512c ln 1
+δ
+ε .
+If δ = 0, Sparse is (α, β) accurate for:
+α = 8c(ln k + ln(2c/β))
+ε
+Proof. We simply apply Theorem 3.24 setting β to be β/c, and ε to be
+ε√8c ln 1
+δ
+and ε/c, depending on whether δ > 0 or δ = 0, respectively.
+Finally, we give a version of Sparse that actually outputs the
+numeric values of the above threshold queries, which we can do with
+only a constant factor loss in accuracy. We call this algorithm Numer-
+icSparse, and it is simply a composition of Sparse with the Laplace
+mechanism. Rather than outputting a vector a ∈ {>, ⊥}∗, it outputs a
+vector a ∈ (R ∪ {⊥})∗.
+We observe that NumericSparse is private:
+Theorem 3.27. NumericSparse is (ε, δ)-diﬀerentially private.
+Proof. Observe that if δ = 0, NumericSparse(D, {fi}, T, c, ε, 0) is sim-
+ply the adaptive composition of Sparse(D, {fi}, T, c, 8
+9 ε, 0), together
+with the Laplace mechanism with privacy parameters (ε′, δ) = ( 1
+9 ε, 0).
+If δ > 0, then NumericSparse(D, {fi}, T, c, ε, 0) is the composition
+of Sparse(D, {fi}, T, c,
+√512√512+1 ε, δ/2) together with the Laplace mecha-
+nism with privacy parameters (ε′, δ) = ( 1√512+1 ε, δ/2). Hence the pri-
+vacy of NumericSparse follows from simple composition.
+To discuss accuracy, we must deﬁne what we mean by the accuracy
+of a mechanism that outputs a stream a ∈ (R ∪ {⊥})∗ in response to a
+sequence of numeric valued queries:
+3.6. The sparse vector technique 63
+Algorithm 3 Input is a private database D, an adaptively chosen
+stream of sensitivity 1 queries f1, . . ., a threshold T , and a cutoff point
+c. Output is a stream of answers a1, . . .
+NumericSparse(D, {fi}, T, c, ε, δ)
+If δ = 0 Let ε1 ← 8
+9 ε, ε2 ← 2
+9 ε. Else Let ε1 =
+√512√512+1 ε, ε2 = 2√512+1
+If δ = 0 Let σ(ε) = 2c
+ε . Else Let σ(ε) =
+√32c ln 2
+δ
+ε
+Let ˆT0 = T + Lap(σ(ε1))
+Let count = 0
+for Each query i do
+Let νi = Lap(2σ(ε1))
+if fi(D) + νi ≥ ˆTcount then
+Let υi ← Lap(σ(ε2))
+Output ai = fi(D) + υi.
+Let count = count +1.
+Let ˆTcount = T + Lap(σ(ε1))
+else
+Output ai = ⊥.
+end if
+if count ≥ c then
+Halt.
+end if
+end for
+Definition 3.10 (Numeric Accuracy). We will say that an algorithm
+which outputs a stream of answers a1, . . . , ∈ (R ∪ {⊥})∗ in response
+to a stream of k queries f1, . . . , fk is (α, β)-accurate with respect to a
+threshold T if except with probability at most β, the algorithm does
+not halt before fk, and for all ai ∈ R:
+|fi(D) − ai| ≤ α
+and for all ai = ⊥:
+fi(D) ≤ T + α.
+Theorem 3.28. For any sequence of k queries f1, . . . , fk such that
+L(T ) ≡ |{i : fi(D) ≥ T − α}| ≤ c, if δ > 0, NumericSparse is (α, β)
+64 Basic Techniques and Composition Theorems
+accurate for:
+α = (ln k + ln 4c
+β )
+√
+c ln 2
+δ (√512 + 1)
+ε .
+If δ = 0, Sparse is (α, β) accurate for:
+α = 9c(ln k + ln(4c/β))
+ε
+Proof. Accuracy requires two conditions: first, that for all ai = ⊥:
+fi(D) ≤ T + α. This holds with probability 1 − β/2 by the accuracy
+theorem for Sparse. Next, for all ai ∈ R, it requires |fi(D) − ai| ≤ α.
+This holds for with probability 1 − β/2 by the accuracy of the Laplace
+mechanism.
+What did we show in the end? If we are given a sequence of queries
+together with a guarantee that only at most c of them have answers
+above T −α, we can answer those queries that are above a given thresh-
+old T , up to error α. This accuracy is equal, up to constants and a factor
+of log k, to the accuracy we would get, given the same privacy guar-
+antee, if we knew the identities of these large above-threshold queries
+ahead of time, and answered them with the Laplace mechanism. That
+is, the sparse vector technique allowed us to fish out the identities of
+these large queries almost “for free”, paying only logarithmically for the
+irrelevant queries. This is the same guarantee that we could have got-
+ten by trying to find the large queries with the exponential mechanism
+and then answering them with the Laplace mechanism. This algorithm,
+however, is trivial to run, and crucially, allows us to choose our queries
+adaptively.
+3.7 Bibliographic notes
+Randomized Response is due to Warner [84] (predating differential
+privacy by four decades!). The Laplace mechanism is due to Dwork
+et al. [23]. The exponential mechanism was invented by McSherry and
+Talwar [60]. Theorem 3.16 (simple composition) was claimed in [21];
+the proof appearing in Appendix B is due to Dwork and Lei [22];
+3.7. Bibliographic notes 65
+McSherry and Mironov obtained a similar proof. The material in Sec-
+tions 3.5.1 and 3.5.2 is taken almost verbatim from Dwork et al. [32].
+Prior to [32] composition was modeled informally, much as we did for
+the simple composition bounds. For specific mechanisms applied on a
+single database, there are “evolution of confidence” arguments due to
+Dinur, Dwork, and Nissim [18, 31], (which pre-date the definition of
+differential privacy) showing that the privacy parameter in k-fold com-
+position need only deteriorate like √k if we are willing to tolerate a
+(negligible) loss in δ (for k < 1/ε2). Theorem 3.20 generalizes those
+arguments to arbitrary differentially private mechanisms,
+The claim that without coordination in the noise the bounds in
+the composition theorems are almost tight is due to Dwork, Naor, and
+Vadhan [29]. The sparse vector technique is an abstraction of a tech-
+nique that was introduced, by Dwork, Naor, Reingold, Rothblum, and
+Vadhan [28] (indicator vectors in the proof of Lemma 4.4). It has sub-
+sequently found wide use (e.g. by Roth and Roughgarden [74], Dwork,
+Naor, Pitassi, and Rothblum [26], and Hardt and Rothblum [44]). In
+our presentation of the technique, the proof of Theorem 3.23 is due to
+Salil Vadhan.
