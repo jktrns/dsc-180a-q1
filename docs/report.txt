@@ -2,6 +2,9 @@
 % !BIB TS-program = bibtex
 \documentclass[12pt,letterpaper]{article}
 \usepackage{style/dsc180reportstyle}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 
 \title{A comparative study of DP-SGD and Private Evolution for differentially private synthetic data}
 
@@ -60,26 +63,24 @@ Building upon DP-SGD, \citet{ghalebikesabi2023differentially} demonstrated that 
 
 \citet{lin2025differentiallyprivatesyntheticdata} proposed a fundamentally different paradigm with their Private Evolution algorithm. Rather than training a model, PE operates exclusively through black-box API access to pre-trained foundation models. The algorithm iteratively selects and mutates synthetic candidates by constructing a differentially private histogram over nearest neighbors in an embedding space. This approach achieved Fréchet Inception Distance (FID, the metric for image generation quality) scores of $7.9$ or lower at $\varepsilon = 0.67$ on image generation tasks, a massive improvement in both privacy and utility from DP-Diffusion. The versatility of this approach has resulted in its extension in subsequent works to text \citep{xie2024differentiallyprivatesyntheticdata} and tabular data \citep{swanberg2025apiaccessllmsuseful}.
 
-\newpage
+% \newpage
 
-\section{Background}
+% \section{Background}
 
-\subsection{Differential privacy}
+% We represent databases as histograms $x \in \mathbb{N}^{|\mathcal{X}|}$ over a universe $\mathcal{X}$ of record types, where $x_i$ denotes the count of records of type $i \in \mathcal{X}$ (e.g., $\mathcal{X} = \{\text{student},\, \text{instructor},\, \text{staff}\}$, $x = (150, 30, 20)$). Two databases are \textit{neighboring} if they differ in the record count of exactly one individual (i.e., their $\ell_1$ distance is at most 1: $\|x - y\|_1 \leq 1$).
 
-We represent databases as histograms $x \in \mathbb{N}^{|\mathcal{X}|}$ over a universe $\mathcal{X}$ of record types, where $x_i$ denotes the count of records of type $i \in \mathcal{X}$ (e.g., $\mathcal{X} = \{\text{student},\, \text{instructor},\, \text{staff}\}$, $x = (150, 30, 20)$). Two databases are \textit{neighboring} if they differ in the record count of exactly one individual (i.e., their $\ell_1$ distance is at most 1: $\|x - y\|_1 \leq 1$).
+% A randomized mechanism $\mathcal{M} \colon \mathbb{N}^{|\mathcal{X}|} \rightarrow \Delta(B)$ maps databases to probability distributions over outputs in range $B$, where $\Delta(B)$ denotes the \textit{probability simplex} (i.e., the set of all probability distributions over $B$).
 
-A randomized mechanism $\mathcal{M} \colon \mathbb{N}^{|\mathcal{X}|} \rightarrow \Delta(B)$ maps databases to probability distributions over outputs in range $B$, where $\Delta(B)$ denotes the \textit{probability simplex} (i.e., the set of all probability distributions over $B$).
+% \begin{definition}[Differential privacy \citep{dwork2014algorithmic}]
+% \label{def:dp}
+% $\mathcal{M}$ satisfies $(\varepsilon, \delta)$-differential privacy if for all neighboring databases $x, y$ with $\|x - y\|_1 \leq 1$ and all measurable sets $S \subseteq B$:
+% \begin{equation}
+% \Pr[\mathcal{M}(x) \in S] \leq \exp(\varepsilon) \Pr[\mathcal{M}(y) \in S] + \delta
+% \end{equation}
+% When $\delta = 0$, we say $\mathcal{M}$ is $\varepsilon$-differentially private.
+% \end{definition}
 
-\begin{definition}[Differential privacy \citep{dwork2014algorithmic}]
-\label{def:dp}
-$\mathcal{M}$ satisfies $(\varepsilon, \delta)$-differential privacy if for all neighboring databases $x, y$ with $\|x - y\|_1 \leq 1$ and all measurable sets $S \subseteq B$:
-\begin{equation}
-\Pr[\mathcal{M}(x) \in S] \leq \exp(\varepsilon) \Pr[\mathcal{M}(y) \in S] + \delta
-\end{equation}
-When $\delta = 0$, we say $\mathcal{M}$ is $\varepsilon$-differentially private.
-\end{definition}
-
-For small $\varepsilon$, the bound $\exp(\varepsilon) \approx 1 + \varepsilon$ ensures outputs are nearly equally likely regardless of any individual's participation. The slack $\delta$ permits rare catastrophes; we conventionally require $\delta \ll 1/\|x\|_1$.
+% For small $\varepsilon$, the bound $\exp(\varepsilon) \approx 1 + \varepsilon$ ensures outputs are nearly equally likely regardless of any individual's participation. The slack $\delta$ permits rare catastrophes; we conventionally require $\delta \ll 1/\|x\|_1$.
 
 % TODO
 
@@ -87,36 +88,198 @@ For small $\varepsilon$, the bound $\exp(\varepsilon) \approx 1 + \varepsilon$ e
 
 \section{Methods}
 
-\subsection{Data, experimental setup}
-Our project uses a synthetic telemetry dataset provided by the instructor. Although the data are artificially generated, we treat them as sensitive to simulate realistic privacy-critical conditions under which differential privacy methods must operate. The dataset is intended to mimic the structure of real-world system telemetry logs, where each record corresponds to a device, session, or event measurement. \\
+Our experiments center on a 152{,}356-row telemetry table that mimics privacy-critical product instrumentation. Each record contains a product family label (\textbf{A--F or Others}), an event label (\textbf{open}, \textbf{close}, \textbf{save}, \textbf{reset}, \textbf{error}), and a timestamp between May and July 2024. Although the table is synthetic, we treat it as sensitive and apply all processing steps exactly as we would for proprietary logs --- pre-training, we drop the anonymized user identifier, convert timestamps to Unix seconds, one-hot encode the categorical columns, and z-score the time feature using a \texttt{ColumnTransformer}. The resulting feature matrix has 13 dimensions, with 12 categorical indicators plus one standardized numeric attribute.
 
-The dataset is provided specifically for two purposes:
-\begin{itemize}
-    \item \textbf{Differentially private data analysis} \\
-    We will compute statistical summaries such as means, histograms, frequency counts, or regression results using DP mechanisms. These tasks simulate real-world applied DP scenarios faced by organizations analyzing sensitive operational data. \\
-    
-    \item \textbf{Differentially private synthetic data generation} \\
-    We will release a new synthetic dataset that satisfies differential privacy. The goal is to demonstrate how DP-SGD can be used to train a model that captures useful structure from sensitive data while formally protecting all individuals represented in the original dataset.
-\end{itemize} 
+\subsection{DP-VAE generator}
+We train a \textit{differentially private variational autoencoder} (DP-VAE) to learn a generative model of the telemetry distribution. The encoder maps our 13-dimensional inputs to a 128-unit hidden layer and outputs a 16-dimensional mean and log-variance. The decoder mirrors this structure and produces logits for each categorical attribute, plus a numeric head for the standardized timestamp. DP-SGD is applied for up to 30 epochs using a batch size of $256$, clip norm $1.0$, noise multiplier $1.0$, and learning rate $3 \times 10^{-3}$. Training halts either after completing all epochs or once the privacy budget is consumed ($\varepsilon = 4.0$ at $\delta = 10^{-5}$). Training minimizes the sum of categorical cross-entropies, mean-squared error for the numeric column, and the Kullback--Leibler divergence between the inferred posterior and the unit Gaussian prior. After training, we sample $z \sim \mathcal{N}(0, I)$, decode to logits, take argmaxes for the categories, and invert the timestamp scaler before clipping to the observed range.
 
-All evaluations, models, and analyses focus exclusively on the provided sensitive-like dataset to align with the project goal of designing an end-to-end DP workflow. \\
+% \begin{table}[h]
+% \centering
+% \begin{tabular}{lc}
+% \toprule
+% \textbf{Hyperparameter} & \textbf{Value} \\
+% \midrule
+% Architecture & 13-128-128 encoder, mean/logvar heads, symmetric decoder \\
+% Batch size & 256 \\
+% Learning rate & $3 \times 10^{-3}$ (Adam) \\
+% Noise multiplier & 1.0 \\
+% Epoch budget & 30 (with early stopping once $\varepsilon \geq 3.9$) \\
+% Latent dimension & 16 \\
+% Clip norm & 1.0 \\
+% \bottomrule
+% \end{tabular}
+% \caption{Differentially private VAE training configuration.}
+% \end{table}
 
-\textbf{Features} \\
-The telemetry dataset contains synthethic event logs that spans over multiple product types. Each row corresponds to a single telemetry event, which mimics real deployment scenarios originate from devices. Here are the following attributes: \\
+\begin{algorithm}[h]
+\caption{Differentially private VAE training}
+\label{alg:dpvae}
+\SetKwInOut{KwInput}{Input}
+\SetKwInOut{KwOutput}{Output}
+\KwInput{Dataset $D$, noise multiplier $\sigma$, clip norm $C$, target $\varepsilon^\star$}
+\KwOutput{Trained parameters $\theta$ and privacy accountant state}
+$\varepsilon \gets 0$\;
+\While{$\varepsilon < \varepsilon^\star$}{
+    Sample batch $B \subset D$\;
+    Compute reconstruction loss
+    $\mathcal{L}_{\text{rec}} = \mathrm{CE}(x_{\text{cat}}, \hat{x}_{\text{cat}}) + \mathrm{MSE}(x_{\text{time}}, \hat{x}_{\text{time}})$\;
+    Compute KL term $\mathcal{L}_{\text{kl}} = \mathrm{KL}(q_\theta(z|x) \parallel \mathcal{N}(0, I))$\;
+    $\mathcal{L} \gets \mathcal{L}_{\text{rec}} + \mathcal{L}_{\text{kl}}$\;
+    Clip per-example gradients of $\mathcal{L}$ to norm $C$\;
+    Add Gaussian noise with standard deviation $\sigma C$ and apply Adam update\;
+    $\varepsilon \gets \texttt{AccountantUpdate}(\varepsilon)$\;
+}
+\end{algorithm}
 
-\begin{table}[h!]
+\newpage
+
+\subsubsection{Evaluation protocol and findings}
+All measurements reported below come from \texttt{notebooks/03-validation.ipynb}, which consumes only the released synthetic dataset for analysis.
+
+We compare empirical distributions for every categorical column. Product family proportions differ by at most $3.95\%$ absolute (class \textbf{B}), while event label deltas remain below $7.4\%$ (class \textbf{close}). The combined visualization and table in Figure~\ref{fig:combined-bar} and Table~\ref{tab:combined-dist} detail these marginals.
+
+\begin{figure}[h]
 \centering
-\begin{tabular}{l p{10cm}}
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=8pt,
+    width=\linewidth,
+    height=6cm,
+    ylabel={Proportion},
+    symbolic x coords={A,B,C,D,E,F,Others,close,error,open,reset,save},
+    xtick=data,
+    xtick style={font=\scriptsize},
+    legend style={at={(0.5,-0.35)},anchor=north,legend columns=-1},
+    ymin=0,
+    ymax=0.45,
+    legend style={
+        at={(0.01,0.96)},
+        anchor=north west
+    },
+    x tick label style={rotate=45,anchor=east},
+]
+\addplot coordinates {(A,0.1516) (B,0.2515) (C,0.1869) (D,0.2004) (E,0.0104) (F,0.0989) (Others,0.1004)
+(close,0.3077) (error,0.0323) (open,0.3827) (reset,0.0675) (save,0.2098)};
+\addplot coordinates {(A,0.1525) (B,0.2910) (C,0.1971) (D,0.2287) (E,0.0001) (F,0.0459) (Others,0.0847)
+(close,0.3813) (error,0.0107) (open,0.4269) (reset,0.0180) (save,0.1631)};
+\legend{Real, Synthetic}
+\end{axis}
+\end{tikzpicture}
+\caption{Product-type and event-type distributions}
+\label{fig:combined-bar}
+\end{figure}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc|lcccc}
 \toprule
-\textbf{Attribute} & \textbf{Description} \\
+\multicolumn{5}{c|}{\textbf{Product type}} & \multicolumn{5}{c}{\textbf{Event type}} \\
+\textbf{Class} & \textbf{Real} & \textbf{Synthetic} & \textbf{$|\Delta|$} & \textbf{$|\Delta|$\%} &
+\textbf{Class} & \textbf{Real} & \textbf{Synthetic} & \textbf{$|\Delta|$} & \textbf{$|\Delta|$\%} \\
 \midrule
-Product Type & A categorical variable that indicates the type of product. Categories include \textbf{A}, \textbf{B}, \textbf{C}, \textbf{D}, \textbf{E}, \textbf{F}, and \textbf{Others} \\ 
-Event Type & Specifies the type of system or user-triggered event. Values include \textbf{open}, \textbf{close}, \textbf{save}, \textbf{reset}, and \textbf{error} \\
-Time of Event & Timestamp recording when each event occurred. All events fall within the period \textbf{May 1, 2024, to July 31, 2024} \\
-User ID & Anonymized identifier representing the user associated with event. \\
+A & 0.152 & 0.153 & 0.001 & 0.09 & close & 0.308 & 0.381 & 0.074 & 7.4 \\
+B & 0.252 & 0.291 & 0.040 & 4.0 & error & 0.032 & 0.011 & 0.022 & 2.2 \\
+C & 0.187 & 0.197 & 0.010 & 1.0 & open & 0.383 & 0.427 & 0.044 & 4.4 \\
+D & 0.200 & 0.229 & 0.028 & 2.8 & reset & 0.068 & 0.018 & 0.050 & 5.0 \\
+E & 0.010 & 0.000 & 0.010 & 1.0 & save & 0.210 & 0.163 & 0.047 & 4.7 \\
+F & 0.099 & 0.046 & 0.053 & 5.3 & & & & & \\
+Others & 0.100 & 0.085 & 0.016 & 1.6 & & & & & \\
 \bottomrule
 \end{tabular}
-\caption{Data Attributes}
+\caption{Distributional comparison for product type and event type}
+\label{tab:combined-dist}
+\end{table}
+
+Kernel density plots over \texttt{TimeSeconds} reveal a slight smoothing effect in the synthetic timeline; the Kolmogorov--Smirnov statistic is $0.137$ with $p < 10^{-150}$, indicating very detectable but bounded deviation (see Figure~\ref{fig:timeseconds-kde}).
+
+\newpage
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth,
+    height=6cm,
+    xlabel={Timestamp (seconds)},
+    ylabel={Density},
+    ymin=0,
+    legend style={
+        at={(0.99,0.96)},
+        anchor=north east
+    },
+    grid=both,
+    minor grid style={gray!20},
+    major grid style={gray!40},
+]
+    \addplot+[smooth, color=RoyalBlue]
+        table [x=seconds, y=density, col sep=comma] {figure/kde-real.csv};
+    \addlegendentry{Real}
+    \addplot+[smooth, color=BrickRed]
+        table [x=seconds, y=density, col sep=comma] {figure/kde-synthetic.csv};
+    \addlegendentry{Synthetic}
+\end{axis}
+\end{tikzpicture}
+\caption{Kernel density estimate of \texttt{TimeSeconds}}
+\label{fig:timeseconds-kde}
+\end{figure}
+
+Figure~\ref{fig:timeseconds-kde} highlights that the DP-VAE concentrates probability mass nearer the middle of the observation window. The synthetic timestamps average $2.77\times 10^{4}$ seconds (7.7 hours) earlier and exhibit $27\%$ less variance than the real data, even while sharing the same support. Table~\ref{tab:time-moments} reports descriptive statistics --- despite the statistically significant gap, both means remain within half a standard deviation of each other, explaining why downstream accuracy barely changes.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Metric} & \textbf{Real} & \textbf{Synthetic} & \textbf{$|\Delta|$} & \textbf{$|\Delta|$\%} \\
+\midrule
+Mean & $1\,718\,462\,125.60$ & $1\,718\,434\,451.10$ & $27\,674.50$ & $0.0016$ \\
+Standard deviation & $2\,265\,577.72$ & $1\,646\,876.40$ & $618\,701.32$ & $27.31$ \\
+Minimum & $1\,714\,521\,637.00$ & $1\,714\,521\,637.00$ & $0.00$ & $0.00$ \\
+Maximum & $1\,722\,383\,984.00$ & $1\,722\,383\,984.00$ & $0.00$ & $0.00$ \\
+\bottomrule
+\end{tabular}
+\caption{Descriptive statistics for \texttt{TimeSeconds} (unit: seconds)}
+\label{tab:time-moments}
+\end{table}
+
+Following \citet{lin2025differentiallyprivatesyntheticdata}, we train multinomial logistic regressions using product family and timestamp as predictors. Training on synthetic data and evaluating on the untouched telemetry table attains $0.380$ accuracy, essentially matching the real-only baseline of $0.381$. The per-class report in Table~\ref{tab:classification-report} shows that both models struggle on the rare \textbf{error}, \textbf{reset}, and \textbf{save} events, predicting none of them with the current feature set. Synthetic training offers a recall boost on the dominant \textbf{close} class (0.418 vs.\ 0.195) while the baseline maintains higher recall for \textbf{open} events. Macro and weighted averages remain nearly identical, reinforcing that synthetic data preserves overall discriminative power but inherits the same blind spots for minority classes.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcccc|cccc}
+\toprule
+& \multicolumn{4}{c|}{\textbf{Synthetic training ($\text{syn}\rightarrow\text{real}$)}} & \multicolumn{4}{c}{\textbf{Baseline ($\text{real}\rightarrow\text{real}$)}} \\
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} & \textbf{Precision} & \textbf{Recall} & \textbf{F1} & \textbf{Support} \\
+\midrule
+close & 0.321 & 0.418 & 0.363 & 46{,}885 & 0.343 & 0.195 & 0.249 & 14{,}020 \\
+error & 0.000 & 0.000 & 0.000 & 4{,}925 & 0.000 & 0.000 & 0.000 & 1{,}461 \\
+open & 0.418 & 0.656 & 0.511 & 58{,}306 & 0.389 & 0.837 & 0.531 & 17{,}544 \\
+reset & 0.000 & 0.000 & 0.000 & 10{,}277 & 0.000 & 0.000 & 0.000 & 3{,}033 \\
+save & 0.000 & 0.000 & 0.000 & 31{,}963 & 0.000 & 0.000 & 0.000 & 9{,}649 \\
+\midrule
+accuracy & \multicolumn{4}{c|}{0.380} & \multicolumn{4}{c}{0.381} \\
+macro avg & 0.148 & 0.215 & 0.175 & 152{,}356 & 0.146 & 0.206 & 0.156 & 45{,}707 \\
+weighted avg & 0.259 & 0.380 & 0.307 & 152{,}356 & 0.255 & 0.381 & 0.280 & 45{,}707 \\
+\bottomrule
+\end{tabular}
+\caption{Per-class metrics for multinomial logistic regression evaluated on the real telemetry table.}
+\label{tab:classification-report}
+\end{table}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+Max product-type delta & $3.95\%$ (class \textbf{B}) \\
+Max event-type delta & $7.36\%$ (class \textbf{close}) \\
+KS statistic (time) & $0.137$ ($p < 10^{-150}$) \\
+LogReg accuracy (syn$\rightarrow$real) & $0.380$ \\
+LogReg accuracy (real$\rightarrow$real) & $0.381$ \\
+\bottomrule
+\end{tabular}
+\caption{Key validation metrics produced by \texttt{03-validation.ipynb}.}
 \end{table}
 
 \newpage
