@@ -9,7 +9,7 @@
 
 ### Abstract
 
-Differentially private synthetic data generation enables the release of realistic datasets while rigorously protecting the privacy of individuals in the source data. We implement a differentially private variational autoencoder (DP-VAE) trained using DP-SGD, which privatizes model training through per-sample gradient clipping and calibrated Gaussian noise injection. Applying this approach to a realistic telemetry dataset, we demonstrate that DP-VAE can generate high-fidelity synthetic records under a modest privacy budget (ε = 4.0).
+Differentially private synthetic data generation enables the release of realistic datasets while rigorously protecting the privacy of individuals in the source data. We implement a differentially private variational autoencoder (DP-VAE) trained using DP-SGD, which privatizes model training through per-sample gradient clipping and calibrated Gaussian noise injection. Applying this approach to a realistic telemetry dataset, we demonstrate that DP-VAE can generate high-fidelity synthetic records under a modest privacy budget ($\varepsilon = 4.0$).
 
 ---
 
