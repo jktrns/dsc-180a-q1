@@ -5,6 +5,7 @@ __pycache__/
 dist/
 build/
 docs/
+data/reporting_queries/
 
 data/cifar-10-batches-py/*
 data/cifar-10-python.tar.gz
