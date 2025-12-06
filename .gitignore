@@ -1,4 +1,9 @@
 __pycache__/
 .cursor/
+.venv/
+*.egg-info/
+dist/
+build/
+
 data/cifar-10-batches-py/*
 data/cifar-10-python.tar.gz

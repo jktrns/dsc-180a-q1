@@ -1,4 +1,4 @@
-# A comparative study of DP-SGD and Private Evolution for differentially private synthetic data
+# Differentially private synthetic data generation via DP-VAE
 
 View the full report [here](https://www.overleaf.com/read/frpngrjrrqkt#80a851).
 
@@ -14,11 +14,11 @@ View the full report [here](https://www.overleaf.com/read/frpngrjrrqkt#80a851).
 
 ## Abstract
 
-Differentially private synthetic data generation enables the release of realistic datasets while rigorously protecting the privacy of individuals in the source data. Two methodologies dominate contemporary research: (1) differentially private stochastic gradient descent (DP-SGD), which privatizes model training through carefully calibrated noise injection, and (2) Private Evolution (PE), which achieves privacy guarantees through inference-only access to pre-trained foundation models. We implement both approaches on realistic datasets, evaluating their privacy-utility trade-offs under varying $\varepsilon$-budgets and computational constraints. Our objective is to assess whether the PE paradigm can rival the fidelity of DP-SGD while obviating the latter's computational and implementation complexity.
+Differentially private synthetic data generation enables the release of realistic datasets while rigorously protecting the privacy of individuals in the source data. We implement a differentially private variational autoencoder (DP-VAE) trained using DP-SGD, which privatizes model training through per-sample gradient clipping and calibrated Gaussian noise injection. Applying this approach to a realistic telemetry dataset, we demonstrate that DP-VAE can generate high-fidelity synthetic records under a modest privacy budget (ε = 4.0).
 
 ---
 
-### Overview
+## Project structure
 
 | Path                                        | Purpose                                                                                                                 |
 | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
@@ -34,39 +34,72 @@ The assets marked as `-deprecated` remain in the repository for traceability but
 
 ---
 
-### Requirements
+## Setup
 
-- Python 3.10+ (tested with 3.12)
-- Recommended packages:
-  - `numpy`
-  - `pandas`
-  - `scikit-learn`
-  - `scipy`
-  - `matplotlib`
-  - `seaborn`
-  - `torch` (GPU optional)
-  - `opacus`
-  - `pgfplots`/`tikz` (LaTeX packages) if you plan to recompile the report
+This project uses [uv](https://docs.astral.sh/uv/) for package management.
 
-You can install the Python dependencies via:
+1. If you don't have uv installed:
 
-```bash
-pip install numpy pandas scikit-learn scipy matplotlib seaborn torch opacus
-```
+   ```bash
+   # macOS/Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Or with Homebrew
+   brew install uv
+
+   # Or with pip
+   pip install uv
+   ```
+
+2. Create your virtual environment:
+
+   ```bash
+   uv venv
+   uv sync
+   ```
+
+   This creates a `.venv` directory and installs all dependencies from `pyproject.toml`.
+
+3. Activate the environment:
+
+   ```bash
+   # macOS/Linux
+   source .venv/bin/activate
+
+   # Windows (PowerShell)
+   .venv\Scripts\Activate.ps1
+
+   # Windows (cmd)
+   .venv\Scripts\activate.bat
+   ```
+
+4. To run the notebooks in Jupyter/VS Code/Cursor, register the virtual environment as a Jupyter kernel. Make sure the `.venv` is activated, then:
+
+   ```bash
+   python -m ipykernel install --user --name dsc-180a-q1 --display-name "DSC 180A Q1"
+   ```
+
+   Now you can select "DSC 180A Q1" as the kernel when opening notebooks.
 
 ---
 
-### Usage
+## Usage
 
-1. **Prepare data**
-   - Place the telemetry CSV at `data/telemetry.csv`.
-   - The generator writes `data/synthetic.csv` by default (existing files will be overwritten).
+1. Place the telemetry CSV at `data/telemetry.csv`. The generator writes `data/synthetic.csv` by default (existing files will be overwritten).
 
-2. **Generate synthetic data**
+2. Generate synthetic data:
+
    ```bash
+   # With venv
    python scripts/dp-vae.py
+
+   # Without venv
+   uv run python scripts/dp-vae.py
    ```
+
    The script trains a differentially private VAE using Opacus and saves the sampled synthetic dataset.
 
-3. **Validate utility**
-   - Open `notebooks/03-validation.ipynb` and run all cells to compare real vs. synthetic distributions, compute KS statistics, and evaluate downstream logistic regression performance.
+3. To validate utility, open `notebooks/03-validation.ipynb` and run all cells to:
+   - Compare real vs. synthetic distributions
+   - Compute KS statistics and z-score metrics
+   - Evaluate downstream logistic regression performance
