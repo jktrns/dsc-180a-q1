@@ -60,8 +60,6 @@ This project uses [uv](https://docs.astral.sh/uv/) for package management.
 
    Now you can select "DSC 180A Q1" as the kernel when opening notebooks.
 
----
-
 ### Project structure
 
 - `data/`: Input telemetry CSV and synthetic data output
@@ -72,8 +70,6 @@ This project uses [uv](https://docs.astral.sh/uv/) for package management.
 - `scripts/dp-vae.py`: DP-VAE with Opacus
 
 The assets marked as `-deprecated` remain in the repository for traceability but are not part of the primary pipeline.
-
----
 
 ## Usage
 
